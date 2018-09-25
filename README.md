@@ -24,4 +24,6 @@ Bottom side, with PLCC52 socket, inside part of pastic need to be cut:
 
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20180906_180757.jpg">
 
+on lower left side: USB, upper lef: I2C connection with fixed data to TDA, on right fixed pullup resistor on D+ line of USB
+
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20180920_154234.jpg">

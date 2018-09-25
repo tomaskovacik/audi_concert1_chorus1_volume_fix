@@ -29,3 +29,17 @@ on lower right connector for controling panel, if this is implemented in code (n
 upper right, ST-Link interface
 
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20180920_154234.jpg">
+
+# COPYING
+
+all is GPLv3
+
+# CONTRIBUTION
+
+contributions are welcome
+
+# PCBs
+
+PCBs are on sale also as whole product, link will be here when store is set
+
+<a href="https://www.tindie.com/stores/tomaskovacik/?ref=offsite_badges&utm_source=sellers_tomaskovacik&utm_medium=badges&utm_campaign=badge_large"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-larges.png" alt="I sell on Tindie" width="200" height="104"></a>

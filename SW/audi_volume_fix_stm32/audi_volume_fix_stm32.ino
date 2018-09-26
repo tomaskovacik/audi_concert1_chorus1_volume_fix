@@ -112,6 +112,9 @@ void decode_i2c(uint8_t data[howmanybytesinpacket]);
    yeh this would one day fix fked volume based on data we have from front panel and so on...
 */
 void set_volume();
+
+void set_loudness();
+
 /*
    calculate speaker attuenations, cose we are calculating this for each speaker, so I make fction to avoid long code...
 */
@@ -249,7 +252,7 @@ void loop()
         //Serial.println(F("MUTE "));
         if ((_data[2] & B00000001)) {
           //2 8 81
-          Serial.println(F("Muting"));dump_i2c_data(_data);
+          Serial.println(F("Muting")); dump_i2c_data(_data);
           if (!mute) { //we are not already muted
             mute = 1; //set mute flag
             saved_volume = current_volume;//save current volume
@@ -260,8 +263,8 @@ void loop()
           sendI2C(_data);//but send mute  command out anyway
         } else { //if it's not 1 then it's zero :)
           //2 8 80
-          Serial.println(F("Unmuting"));dump_i2c_data(_data);
-          
+          Serial.println(F("Unmuting")); dump_i2c_data(_data);
+
           if (mute) { //only unmute, if we are not unmuted already
             mute = 0; //clear mute flag
             volume = saved_volume;
@@ -288,20 +291,20 @@ void loop()
    send mute data over i2c
 */
 void set_mute() {
-  if (!mute){
-    mute=1;
-  uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  sendI2C(mute_data);
+  if (!mute) {
+    mute = 1;
+    uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    sendI2C(mute_data);
   }
 }
 /*
    send unmute data over i2c
 */
 void set_unmute() {
-  if(mute){
-    mute=0;
-  uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  sendI2C(mute_data);
+  if (mute) {
+    mute = 0;
+    uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    sendI2C(mute_data);
   }
 }
 
@@ -437,8 +440,6 @@ void set_volume_down() {
 
 */
 void set_volume() {
-
-
   while (volume != current_volume) { //need to fix volume
     //    Serial.println("=================== before fix ====================");
     //    Serial.print("current volume: "); Serial.println(current_volume, HEX);
@@ -451,72 +452,63 @@ void set_volume() {
       else current_volume = current_volume - 2;
       volume_packet[2] = current_volume;
       sendI2C(volume_packet);
-      if (volume > 0x65) {
-        loudness = 0x0E;
-      } else if (volume > 0x5D) {
-        loudness = 0x0D;
-      } else if (volume > 0x59) {
-        loudness = 0x0C;
-      } else if (volume > 0x55) {
-        loudness = 0x0B;
-      } else if (volume > 0x51) {
-        loudness = 0x0A;
-      } else if (volume > 0x4D) {
-        loudness = 0x09;
-      } else if (volume > 0x49) {
-        loudness = 0x08;
-      } else if (volume > 0x45) {
-        loudness = 0x07;
-      } else if (volume > 0x41) {
-        loudness = 0x06;
-      }
     }
     if (current_volume < volume) { //current volume is less then volume , so we are turning volume down, step is 4 but some steps are more not divadeble by 4 (from a4 to be, for example)
       if ((volume - current_volume) == 1) current_volume = volume;
       else current_volume = current_volume + 2; //so we stick to 2
       volume_packet[2] = current_volume;
       sendI2C(volume_packet);
-      if (volume < 0x49) {
-        loudness = 0x08;
-      } else if (volume < 0x4D) {
-        loudness = 0x09;
-      } else if (volume <  0x51) {
-        loudness = 0x0A;
-      } else if (volume < 0x55) {
-        loudness = 0x0B;
-      } else if (volume < 0x59) {
-        loudness = 0x0C;
-      } else if (volume < 0x5D) {
-        loudness = 0x0D;
-      }
     }
     delay(1);
-    while (current_loudness != loudness) { //need to hack this, cose loudness is set while volume is changed
-      //Serial.print(F("fixing loudness from ")); Serial.print(current_loudness, HEX); Serial.print(F(" to ")); Serial.println(loudness, HEX);
-      //loudness is changed in increments of 1 so
-      if (current_loudness < loudness) {
-        loudness_packet[2] = ++current_loudness;
-        sendI2C(loudness_packet);
-      }
-      if (current_loudness > loudness) {
-        loudness_packet[2] = --current_loudness;
-        sendI2C(loudness_packet);
-      }
-      delay(1);
-    }
-      Serial.println("=================== after fix ====================");
-      Serial.print("current volume: "); Serial.println(current_volume, HEX);
-      Serial.print("volume: "); Serial.println(volume, HEX);
-      Serial.print("saved volume: "); Serial.println(saved_volume, HEX);
-      Serial.print("current loudness: "); Serial.println(current_loudness, HEX);
-      Serial.print("Loudness: "); Serial.println(loudness, HEX);
-      if (mute) Serial.println("Muted");
-      else Serial.println("Unmuted");
-      Serial.println("====================================================");
+
+    Serial.println("=================== after fix ====================");
+    Serial.print("current volume: "); Serial.println(current_volume, HEX);
+    Serial.print("volume: "); Serial.println(volume, HEX);
+    Serial.print("saved volume: "); Serial.println(saved_volume, HEX);
+    Serial.print("current loudness: "); Serial.println(current_loudness, HEX);
+    Serial.print("Loudness: "); Serial.println(loudness, HEX);
+    if (mute) Serial.println("Muted");
+    else Serial.println("Unmuted");
+    Serial.println("====================================================");
   }
-  
-    if (volume == 0xFF) set_mute();
-    if (volume < 0xFE) set_unmute();
+
+  if (volume == 0xFF) set_mute();
+  if (volume < 0xFE) set_unmute();
+}
+
+void set_loudness()
+{
+  if (volume > 0x66) {
+    loudness = 0x0E;
+  } else if (0x66 >= volume && volume > 0x5E) {
+    loudness = 0x0D;
+  } else if (0x5E >= volume && volume > 0x5A) {
+    loudness = 0x0C;
+  } else if (0x5A >= volume && volume > 0x56) {
+    loudness = 0x0B;
+  } else if (0x56 >= volume && volume > 0x52) {
+    loudness = 0x0A;
+  } else if (0x52 >= volume && volume > 0x4E) {
+    loudness = 0x09;
+  } else if (0x4E >= volume && volume > 0x4A) {
+    loudness = 0x08;
+  } else if (0x4A >= volume && volume > 0x46) {
+    loudness = 0x07;
+  } else if (0x46 >= volume) {
+    loudness = 0x06;
+  }
+  while (current_loudness != loudness) { //need to hack this, cose loudness is set while volume is changed
+    //Serial.print(F("fixing loudness from ")); Serial.print(current_loudness, HEX); Serial.print(F(" to ")); Serial.println(loudness, HEX);
+    //loudness is changed in increments of 1 so
+    if (current_loudness < loudness) {
+      loudness_packet[2] = ++current_loudness;
+    }
+    if (current_loudness > loudness) {
+      loudness_packet[2] = --current_loudness;
+    }
+    sendI2C(loudness_packet);
+    delay(1);
+  }
 }
 
 void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
@@ -653,7 +645,7 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
         Serial.write(_data[7]);
         Serial.write(_data[8]);
         Serial.write(_data[9]);
-      
+
         Serial.println();
       }
       break;
@@ -929,7 +921,7 @@ void sendI2C (uint8_t data[howmanybytesinpacket]) {
   //i2c_stop(); // send stop condition
   SWire.endTransmission();    // stop transmitting
   //Serial.println();
- // decode_i2c(data);
+  // decode_i2c(data);
 }
 
 

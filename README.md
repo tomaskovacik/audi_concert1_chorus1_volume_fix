@@ -23,17 +23,13 @@ Bottom side, with PLCC52 socket, inside part of pastic need to be cut:
 
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20180906_180757.jpg">
 
-on lower left side: USB
+Upper side, with comments to sockets
 
-upper lef: I2C connection with fixed data to TDA
+<img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20180920_154234_comments.jpg">
 
-on lower right: connector for controling panel, if this is implemented in code (not yet)
+How to wire it (currently without intefacing with front pannel)
 
-middle right: fixed pullup resistor on D+ line of USB
-
-upper right: ST-Link interface
-
-<img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20180920_154234.jpg">
+<img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20181003_170247.jpg">
 
 # COPYING
 

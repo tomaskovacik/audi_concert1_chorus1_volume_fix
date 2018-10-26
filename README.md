@@ -1,8 +1,7 @@
 Software and hardware to fix volume problem on audi concert1/chorus1 units made by blaupunkt.
 
-everything is working, maybe minnor issues in code/logic:
+know issues <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/issues">are here</a>
 
-after restart of car, looks like loudness is not set properly, but turning volume 1 click will fix this, probably bug in automatic loudness settings
 
 Schematics:
 

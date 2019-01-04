@@ -173,25 +173,29 @@ void setup ()
   loudness_packet[0] = 0x02;
   volume_packet[1] = 0x02;
   loudness_packet[1] = 0x01;
-  for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
-    volume_packet[i] = 0;
-    loudness_packet[i] = 0;
-  }
-  //init pins for display SPI
-  pinMode(displayCLK, INPUT_PULLUP);
-  pinMode(displaySTATUS, INPUT_PULLUP);
-  pinMode(displayDATA, INPUT_PULLUP);
-  //pinMode(displayRESET, INPUT);
-  //init interrupt on STATUS line to grab data send betwen display and main CPU
-  attachInterrupt(digitalPinToInterrupt(displaySTATUS), enableInteruptOnCLK, RISING);
   //init slave i2c to grab data for TDA7342
   Wire.begin (MY_ADDRESS);
   Wire.onReceive (receiveEvent);
   //master i2c to send data(fixed) to TDA7342
   SWire.begin();
+  
+
+//  for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
+//    volume_packet[i] = 0;
+//    loudness_packet[i] = 0;
+//  }
+  //init pins for display SPI
+  pinMode(displaySTATUS, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(displaySTATUS), enableInteruptOnCLK, RISING);
+  pinMode(displayCLK, INPUT_PULLUP);
+  pinMode(displayDATA, INPUT_PULLUP);
+  //pinMode(displayRESET, INPUT);
+  //init interrupt on STATUS line to grab data send betwen display and main CPU
+
+  
+
   //serial for debug
   Serial.begin(115200);
-  Serial.println(F("start"));
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
   //        Serial.println(F("I2C init failed");
@@ -252,7 +256,7 @@ void loop()
         //Serial.println(F("MUTE "));
         if ((_data[2] & B00000001)) {
           //2 8 81
-          Serial.println(F("Muting")); dump_i2c_data(_data);
+          //Serial.println(F("Muting")); dump_i2c_data(_data);
           if (!mute) { //we are not already muted
             mute = 1; //set mute flag
             saved_volume = current_volume;//save current volume
@@ -263,7 +267,7 @@ void loop()
           sendI2C(_data);//but send mute  command out anyway
         } else { //if it's not 1 then it's zero :)
           //2 8 80
-          Serial.println(F("Unmuting")); dump_i2c_data(_data);
+          //Serial.println(F("Unmuting")); dump_i2c_data(_data);
 
           if (mute) { //only unmute, if we are not unmuted already
             mute = 0; //clear mute flag
@@ -461,15 +465,15 @@ void set_volume() {
     }
     delay(1);
 
-    Serial.println("=================== after fix ====================");
-    Serial.print("current volume: "); Serial.println(current_volume, HEX);
-    Serial.print("volume: "); Serial.println(volume, HEX);
-    Serial.print("saved volume: "); Serial.println(saved_volume, HEX);
-    Serial.print("current loudness: "); Serial.println(current_loudness, HEX);
-    Serial.print("Loudness: "); Serial.println(loudness, HEX);
-    if (mute) Serial.println("Muted");
-    else Serial.println("Unmuted");
-    Serial.println("====================================================");
+//    Serial.println("=================== after fix ====================");
+//    Serial.print("current volume: "); Serial.println(current_volume, HEX);
+//    Serial.print("volume: "); Serial.println(volume, HEX);
+//    Serial.print("saved volume: "); Serial.println(saved_volume, HEX);
+//    Serial.print("current loudness: "); Serial.println(current_loudness, HEX);
+//    Serial.print("Loudness: "); Serial.println(loudness, HEX);
+//    if (mute) Serial.println("Muted");
+//    else Serial.println("Unmuted");
+//    Serial.println("====================================================");
   }
 
   if (volume == 0xFF) set_mute();
@@ -913,7 +917,9 @@ void sendI2C (uint8_t data[howmanybytesinpacket]) {
 
   for (byte i = 0 ; i < data[0]; i++) {
     //i2c_write(data[i + 1]);
-    SWire.write(data[i + 1]);              // sends one byte
+    while (!SWire.write(data[i + 1])){
+      delay(10);
+      }              // sends one byte
 
     //Serial.print(data[i + 1], HEX);
     //Serial.print(F(" ");
@@ -1291,4 +1297,3 @@ void decode_button_push(uint8_t data) {
       break;
   }
 }
-

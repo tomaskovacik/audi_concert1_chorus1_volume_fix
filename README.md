@@ -39,11 +39,11 @@ How to wire it (currently without intefacing with front pannel)
 
 # COPYING
 
-all is GPLv3
+Everything is under GPLv3
 
 # CONTRIBUTION
 
-contributions are welcome
+Contributions are welcome
 
 # PCBs
 

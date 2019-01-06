@@ -12,7 +12,7 @@ Schematics in <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_vol
 
 Assemble plan:
 
-<img src="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/raw/master/HW/standalone/audi_concert1_chorus1_volume_fix/assemble_plan.png">
+<img src="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/raw/master/HW/standalone/audi_concert1_chorus1_volume_fix/assemble_plan_V1.0.png">
 
 
 Pictures of finished product:

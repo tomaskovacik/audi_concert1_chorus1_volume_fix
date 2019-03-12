@@ -455,14 +455,17 @@ void set_volume() {
       if ((current_volume - volume) == 1) current_volume = volume;
       else current_volume = current_volume - 2;
       volume_packet[2] = current_volume;
+      set_loudness();
       sendI2C(volume_packet);
     }
     if (current_volume < volume) { //current volume is less then volume , so we are turning volume down, step is 4 but some steps are more not divadeble by 4 (from a4 to be, for example)
       if ((volume - current_volume) == 1) current_volume = volume;
       else current_volume = current_volume + 2; //so we stick to 2
       volume_packet[2] = current_volume;
+      set_loudness();
       sendI2C(volume_packet);
     }
+    
     delay(1);
 
 //    Serial.println("=================== after fix ====================");
@@ -870,7 +873,7 @@ void readCLK()
   // Serial.println(digitalRead(displayDATA),DEC);
   if (digitalRead(displayDATA)) {
     // if (DATA_IS_HIGH) {
-    // Serial.print(1);
+    //Serial.print(1);
     _byte = (_byte << 1) | 1;
   } else {
     // Serial.print(0);
@@ -881,7 +884,7 @@ void readCLK()
 // called by interrupt service routine when incoming data arrives
 void receiveEvent (int howMany)
 {
-  //Serial.print(F("grabing i2c: wdp: "); Serial.print(wdp); Serial.print(F(" howmany: "); Serial.println(howMany);
+  //Serial.print(F("grabing i2c: wdp: ")); Serial.print(wdp);// Serial.print(F(" howmany: "); Serial.println(howMany);
   reading_i2c = 1;
   data[wdp][0] = howMany;
   for (uint8_t i = 0; i < howMany; i++) {
@@ -898,7 +901,7 @@ void receiveEvent (int howMany)
 
 
 void sendI2C (uint8_t data[howmanybytesinpacket]) {
-  //decode_i2c(data);
+  decode_i2c(data);
   //  int timeout_us = 5000;
   //  while (!i2c_start((I2C_7BITADDR << 1) | I2C_WRITE) && timeout_us > 0) {
   //    delayMicroseconds(20);

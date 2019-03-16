@@ -271,7 +271,7 @@ void loop()
           if (mute) { //only unmute, if we are not unmuted already
             mute = 0; //clear mute flag
             volume = saved_volume;
-            saved_volume = start_volume; //set this to safe value if we fucked something in code, which I probably did :)
+            //saved_volume = start_volume; //set this to safe value if we fucked something in code, which I probably did :)
             set_volume();
           }
           sendI2C(_data);//send unmute command out before volume set

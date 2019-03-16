@@ -373,7 +373,7 @@ void set_volume_up() {
   } else if (volume > 0x10) {
     volume = 0x10;
   }
-  if (volume < 10) volume = 0x10; //top volume, seen on original comunication was never less then 0x10
+  if (volume < 0x10) volume = 0x10; //top volume, seen on original comunication was never less then 0x10
 }
 
 void set_volume_down() {

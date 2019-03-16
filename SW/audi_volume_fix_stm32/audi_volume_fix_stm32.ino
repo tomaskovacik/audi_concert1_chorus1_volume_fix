@@ -54,7 +54,7 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 //we are trying to interface with comunication to TDA7342 which is 0x44 so...
 #define I2C_7BITADDR 0x44
 //array is klasik byte howmanypackets X howmanybytesinpacket
-#define howmanypackets 10
+#define howmanypackets 20
 #define howmanybytesinpacket 15
 
 const byte MY_ADDRESS = I2C_7BITADDR;
@@ -100,25 +100,28 @@ uint8_t loudness_packet[howmanybytesinpacket];
 /*
    functions
 */
+
 /*
    function is sending i2c packet, one day with fixed volume values :)
 */
 void sendI2C(uint8_t data[howmanybytesinpacket]);
+
 /*
    decode all i2c from MCU heading to TDA7342, with probably fked volume data
 */
 void decode_i2c(uint8_t data[howmanybytesinpacket]);
+
 /*
    yeh this would one day fix fked volume based on data we have from front panel and so on...
 */
 void set_volume();
-
 void set_loudness();
 
 /*
    calculate speaker attuenations, cose we are calculating this for each speaker, so I make fction to avoid long code...
 */
 void spk_atten(uint8_t c);
+
 /*
    RISING interupt on STATE line
    it enable RISING interupt on CLK line to grab data on dataline when fired
@@ -138,15 +141,16 @@ void spk_atten(uint8_t c);
             zeroing _byte variable, just in case, we should not need this, cose ther should be 8 runs of CLK pulses, so it should overflow all old data .... but just in case we are doing it
             seting grabing_SPI flag
             enabling RISING interupt on CLK line
-
 */
 void enableInteruptOnCLK();
+
 /*
 
     fired when STATE goes LOW, disale any CLK interupt, and enable RISING interupt on STATE line
 
 */
 void disableInteruptOnCLK();
+
 /*
 
    function to grabing data if CLK goes HIGH
@@ -154,13 +158,11 @@ void disableInteruptOnCLK();
 */
 void readCLK();
 
-
 /*
 
    clasic setup function
 
 */
-
 void dump_i2c_data(uint8_t _data[howmanybytesinpacket]);
 
 void set_mute();
@@ -179,7 +181,6 @@ void setup ()
   //master i2c to send data(fixed) to TDA7342
   SWire.begin();
   
-
 //  for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
 //    volume_packet[i] = 0;
 //    loudness_packet[i] = 0;
@@ -191,8 +192,6 @@ void setup ()
   pinMode(displayDATA, INPUT_PULLUP);
   //pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data send betwen display and main CPU
-
-  
 
   //serial for debug
   Serial.begin(115200);

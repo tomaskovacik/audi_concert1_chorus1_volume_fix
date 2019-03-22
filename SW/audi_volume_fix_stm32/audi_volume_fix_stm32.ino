@@ -1254,7 +1254,7 @@ void decode_button_push(uint8_t data) {
     case PANEL_PREVIOUS_TRACK:
       Serial.println(F(" << "));
       break;
-    case PANEL_FAD:
+    case PANEL_FADE:
       Serial.println(F(" FAD"));
       break;
     case PANEL_BALANCE:

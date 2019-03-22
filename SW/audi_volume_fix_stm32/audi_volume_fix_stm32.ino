@@ -1217,7 +1217,7 @@ void decode_button_push(uint8_t data) {
     case PANEL_4:
       Serial.println(F(" 4"));
       break;
-    case :PANEL_5:
+    case PANEL_5:
       Serial.println(F(" 5"));
       break;
     case PANEL_6

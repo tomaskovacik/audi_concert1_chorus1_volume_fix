@@ -2,6 +2,7 @@
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
 #include <SlowSoftWire.h> //so we do not have single lib for slave/master, so we have to init another one for master .... cose we do not have 3HW i2c .... tiktak ...
+#include "audi_concert_panel.h"
 
 SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 
@@ -98,6 +99,7 @@ volatile uint8_t legite_mute=0;
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
+uint8_t displayRESETstate=0;
 /*
    functions
 */
@@ -191,7 +193,7 @@ void setup ()
   attachInterrupt(digitalPinToInterrupt(displaySTATUS), enableInteruptOnCLK, RISING);
   pinMode(displayCLK, INPUT_PULLUP);
   pinMode(displayDATA, INPUT_PULLUP);
-  //pinMode(displayRESET, INPUT);
+  pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data send betwen display and main CPU
 
   //serial for debug
@@ -204,6 +206,15 @@ void setup ()
 
 void loop()
 {
+  if (digitalRead(displayRESET) && !displayRESETstate){
+    Serial.println("Reset HIGH");
+    displayRESETstate=1;
+  }
+  if (!digitalRead(displayRESET) && displayRESETstate){
+    Serial.println("Reset LOW");
+    displayRESETstate=0;
+    drdp = dwdp = drdp = 0;
+  }
   if (!grabing_SPI) { //no data are send on SPI line
     while (drdp != dwdp) { //reading and writing pointers are not in sync, we have some data which should be analyzed
       //move current reading data from array of packet in separate variable,
@@ -216,7 +227,7 @@ void loop()
       }
       if (_data[0] == 0x25)//button push
       {
-        //decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
+        decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
         Serial.println();
         if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/trebble/ballance/fade, we set grab_volume=0 when display shows bass/trebble/ballance/fade)
           set_volume_up();
@@ -1207,94 +1218,94 @@ void spk_atten(uint8_t c) {
 void decode_button_push(uint8_t data) {
   // Serial.print(data,HEX);
   switch (data) {
-    case 0x01:
+    case PANEL_1:
       Serial.println(F(" 1"));
       break;
-    case 0x02:
+    case PANEL_2:
       Serial.println(F(" 2"));
       break;
-    case 0x03:
+    case PANEL_3:
       Serial.println(F(" 3"));
       break;
-    case 0x04:
+    case PANEL_4:
       Serial.println(F(" 4"));
       break;
-    case 0x05:
+    case PANEL_5:
       Serial.println(F(" 5"));
       break;
-    case 0x06:
+    case PANEL_6:
       Serial.println(F(" 6"));
       break;
-    case 0x07:
+    case PANEL_SEEK_UP:
       Serial.println(F(" seek > "));
       break;
-    case 0x08:
+    case PANEL_TP:
       Serial.println(F(" TP"));
       break;
-    case 0x09:
+    case PANEL_RDS:
       Serial.println(F(" RDS"));
       break;
-    case 0x0A:
+    case PANEL_CPS:
       Serial.println(F(" CPS"));
       break;
-    case 0x0B:
+    case PANEL_MODE:
       Serial.println(F(" MODE"));
       break;
-    case 0x0C:
+    case PANEL_RD:
       Serial.println(F(" RD(ranodm ? )"));
       break;
-    case 0x0D:
+    case PANEL_PREVIOUS_TRACK:
       Serial.println(F(" << "));
       break;
-    case 0x0E:
+    case PANEL_FADE:
       Serial.println(F(" FAD"));
       break;
-    case 0x0F:
+    case PANEL_BALANCE:
       Serial.println(F(" BALANCE"));
       break;
-    case 0x10:
+    case PANEL_BASS:
       Serial.println(F(" BASS"));
       break;
-    case 0x11:
+    case PANEL_AM:
       Serial.println(F(" AM"));
       break;
-    case 0x12:
+    case PANEL_DOLBY:
       Serial.println(F(" Dolby"));
       break;
-    case 0x13:
+    case PANEL_NEXT_TRACK:
       Serial.println(F(" >>"));
       break;
-    case 0x14:
+    case PANEL_TREBLE:
       Serial.println(F(" TREB"));
       break;
-    case 0x15:
+    case PANEL_AS:
       Serial.println(F(" AS"));
       break;
-    case 0x16:
+    case PANEL_SCAN:
       Serial.println(F(" SCAN"));
       break;
-    case 0x17:
+    case PANEL_FM:
       Serial.println(F(" FM"));
       break;
-    case 0x18:
+    case PANEL_SEEK_DOWN:
       Serial.println(F(" Seek < "));
       break;
-    case 0x19:
+    case PANEL_REVERSE:
       Serial.println(F(" REV"));
       break;
-    case 0x86:
+    case PANEL_KNOB_UP:
       Serial.println(F(" Knob + "));
       break;
-    case 0x88:
+    case PANEL_KNOB_DOWN:
       Serial.println(F(" Knob - "));
       break;
-    case 0x1E:
+    case PANEL_CODE_IN:
       Serial.println(F(" Code in (TP + RDS)"));
       break;
-    case 0x1F:
+    case PANEL_EJECT:
       Serial.println(F("eject"));
       break;
-    case 0x21:
+    case PANEL_BUTTON_RELEASE:
       Serial.println(F("button release"));
       break;
     default:

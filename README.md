@@ -47,6 +47,6 @@ Contributions are welcome
 
 # PCBs
 
-PCBs are on sale also as whole product, link will be here when store is set
+PCBs are on sale also as whole product, kitt (PCB, soldered crystals, unsoldered preprogramed IC, pasives,PLCC52 socket)
 
 <a href="https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-larges.png" alt="I sell on Tindie" width="200" height="104"></a>

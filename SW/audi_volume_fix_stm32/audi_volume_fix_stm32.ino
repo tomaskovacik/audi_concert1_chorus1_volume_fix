@@ -90,8 +90,6 @@ volatile uint8_t current_loudness = start_loudness; //start loudness : OFF
 
 volatile uint8_t grab_volume = 1;
 
-volatile uint8_t TA_volume = 1;
-
 volatile uint8_t mute = 0;
 
 

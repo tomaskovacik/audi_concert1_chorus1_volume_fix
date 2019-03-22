@@ -98,6 +98,7 @@ volatile uint8_t mute = 0;
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
+uint8_t displayRESETstate=0;
 /*
    functions
 */
@@ -191,7 +192,7 @@ void setup ()
   attachInterrupt(digitalPinToInterrupt(displaySTATUS), enableInteruptOnCLK, RISING);
   pinMode(displayCLK, INPUT_PULLUP);
   pinMode(displayDATA, INPUT_PULLUP);
-  //pinMode(displayRESET, INPUT);
+  pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data send betwen display and main CPU
 
   //serial for debug
@@ -204,6 +205,15 @@ void setup ()
 
 void loop()
 {
+  if (digitalRead(displayRESET) && !displayRESETstate){
+    Serial.println("Reset HIGH");
+    displayRESETstate=1;
+  }
+  if (!digitalRead(displayRESET) && displayRESETstate){
+    Serial.println("Reset LOW");
+    displayRESETstate=0;
+    drdp = dwdp = drdp = 0;
+  }
   if (!grabing_SPI) { //no data are send on SPI line
     while (drdp != dwdp) { //reading and writing pointers are not in sync, we have some data which should be analyzed
       //move current reading data from array of packet in separate variable,
@@ -216,7 +226,7 @@ void loop()
       }
       if (_data[0] == 0x25)//button push
       {
-        //decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
+        decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
         Serial.println();
         if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/trebble/ballance/fade, we set grab_volume=0 when display shows bass/trebble/ballance/fade)
           set_volume_up();

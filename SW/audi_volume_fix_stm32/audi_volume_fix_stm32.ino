@@ -93,7 +93,6 @@ volatile uint8_t grab_volume = 1;
 volatile uint8_t TA_volume = 1;
 
 volatile uint8_t mute = 0;
-volatile uint8_t legite_mute=0;
 
 
 uint8_t volume_packet[howmanybytesinpacket];
@@ -268,27 +267,25 @@ void loop()
         if ((_data[2] & B00000001)) {
           //2 8 81
           //Serial.println(F("Muting")); dump_i2c_data(_data);
-          if (!mute && volume == 0xFF) { //we are not already muted and if voluem is set to zero (or 0xFF) if it's not mute is not legit
-            //this need more tests, especialy if mute is needed, for example switching to fm/am/tape/cdchanger/search ....  
+          if (!mute) { //we are not already muted
             mute = 1; //set mute flag
-           // saved_volume = current_volume;//save current volume
-           // volume = 0xFF; //set volume to be 0xFF (volume full down,off)
-            //set_volume();//set new volume
+            saved_volume = current_volume;//save current volume
+            volume = 0xFF; //set volume to be 0xFF (volume full down,off)
+            set_volume();//set new volume
             delay(5);//to be sure? should check this on scope,
-            sendI2C(_data);//but send mute  command out anyway            
           }
+          sendI2C(_data);//but send mute  command out anyway
         } else { //if it's not 1 then it's zero :)
           //2 8 80
           //Serial.println(F("Unmuting")); dump_i2c_data(_data);
 
-          if (mute && volume == 0xFF ) { //only unmute, if we are not unmuted already, and if volume is == 0xFF
+          if (mute) { //only unmute, if we are not unmuted already
             mute = 0; //clear mute flag
-            //volume = saved_volume;
+            volume = saved_volume;
             //saved_volume = start_volume; //set this to safe value if we fucked something in code, which I probably did :)
-            //set_volume();
-            sendI2C(_data);//send unmute command out before volume set
+            set_volume();
           }
-          
+          sendI2C(_data);//send unmute command out before volume set
         }
       } else {
         sendI2C(_data);
@@ -311,7 +308,7 @@ void set_mute() {
   if (!mute) {
     mute = 1;
     uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    //sendI2C(mute_data);
+    sendI2C(mute_data);
   }
 }
 /*
@@ -321,7 +318,7 @@ void set_unmute() {
   if (mute) {
     mute = 0;
     uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-   // sendI2C(mute_data);
+    sendI2C(mute_data);
   }
 }
 

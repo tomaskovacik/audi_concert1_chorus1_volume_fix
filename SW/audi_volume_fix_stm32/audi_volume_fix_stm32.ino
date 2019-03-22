@@ -321,6 +321,7 @@ void set_unmute() {
 }
 
 void set_volume_up() {
+  mute=1; //fix #3
   // volume, 0xFF=off, 0x00=full on
   // if (volume == 0xFF) set_unmute();
   if (volume > 0xEA) {
@@ -386,6 +387,7 @@ void set_volume_up() {
 }
 
 void set_volume_down() {
+  mute=1; //fix #3
   if (volume < 0x14) {
     volume = 0x14;
   } else if (volume < 0x18) {

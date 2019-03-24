@@ -15,7 +15,7 @@ Comment3 ""
 Comment4 ""
 $EndDescr
 $Comp
-L 68HC05:68HC05_PLCC U1
+L audi_concert1_chorus1_volume_fix-rescue:68HC05_PLCC-68HC05 U1
 U 1 1 5ACFFF11
 P 6750 8450
 F 0 "U1" H 6750 8650 70  0000 C CNN
@@ -55,7 +55,7 @@ SDA_FROM_MOTO
 Text Label 5150 8350 0    50   ~ 0
 SCL_FROM_MOTO
 $Comp
-L con:CONN_2 CON1
+L audi_concert1_chorus1_volume_fix-rescue:CONN_2-con CON1
 U 1 1 5AD00379
 P 1050 2750
 F 0 "CON1" H 919 2403 60  0000 C CNN
@@ -85,8 +85,8 @@ $Comp
 L Device:R R6
 U 1 1 5AD00BD8
 P 5050 3850
-F 0 "R6" V 5300 4050 50  0000 C CNN
-F 1 "1k" V 5300 3800 50  0000 C CNN
+F 0 "R6" V 5050 3850 50  0000 C CNN
+F 1 "1k" V 5100 4000 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4980 3850 50  0001 C CNN
 F 3 "~" H 5050 3850 50  0001 C CNN
 	1    5050 3850
@@ -96,8 +96,8 @@ $Comp
 L Device:R R7
 U 1 1 5AD00C73
 P 5050 3950
-F 0 "R7" V 4900 4050 50  0000 C CNN
-F 1 "1k" V 4900 3800 50  0000 C CNN
+F 0 "R7" V 5050 3950 50  0000 C CNN
+F 1 "1k" V 5000 4100 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4980 3950 50  0001 C CNN
 F 3 "~" H 5050 3950 50  0001 C CNN
 	1    5050 3950
@@ -111,8 +111,8 @@ $Comp
 L Device:R R9
 U 1 1 5AD018B6
 P 5300 5000
-F 0 "R9" V 5150 5000 50  0000 C CNN
-F 1 "47k" V 5150 4850 50  0000 C CNN
+F 0 "R9" V 5300 5000 50  0000 C CNN
+F 1 "47k" V 5350 5200 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 5230 5000 50  0001 C CNN
 F 3 "~" H 5300 5000 50  0001 C CNN
 	1    5300 5000
@@ -122,8 +122,8 @@ $Comp
 L Device:R R10
 U 1 1 5AD0191E
 P 5400 5000
-F 0 "R10" V 5250 5000 50  0000 C CNN
-F 1 "47k" V 5250 4850 50  0000 C CNN
+F 0 "R10" V 5400 5000 50  0000 C CNN
+F 1 "47k" V 5350 4800 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 5330 5000 50  0001 C CNN
 F 3 "~" H 5400 5000 50  0001 C CNN
 	1    5400 5000
@@ -141,7 +141,7 @@ Connection ~ 5350 5300
 Wire Wire Line
 	5350 5300 5400 5300
 $Comp
-L pwr:5V #PWR0102
+L audi_concert1_chorus1_volume_fix-rescue:5V-pwr #PWR0102
 U 1 1 5AD01E43
 P 6750 6350
 F 0 "#PWR0102" H 6750 6310 30  0001 C CNN
@@ -152,7 +152,7 @@ F 3 "" H 6750 6350 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L pwr:5V #PWR0103
+L audi_concert1_chorus1_volume_fix-rescue:5V-pwr #PWR0103
 U 1 1 5AD01E63
 P 5350 5550
 F 0 "#PWR0103" H 5350 5510 30  0001 C CNN
@@ -179,8 +179,8 @@ $Comp
 L Device:R R4
 U 1 1 5AD026E6
 P 5050 3550
-F 0 "R4" V 5250 3400 50  0000 C CNN
-F 1 "1k" V 5250 3650 50  0000 C CNN
+F 0 "R4" V 5050 3550 50  0000 C CNN
+F 1 "1k" V 5100 3700 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4980 3550 50  0001 C CNN
 F 3 "~" H 5050 3550 50  0001 C CNN
 	1    5050 3550
@@ -190,8 +190,8 @@ $Comp
 L Device:R R5
 U 1 1 5AD033F9
 P 5050 3650
-F 0 "R5" V 4950 3700 50  0000 C CNN
-F 1 "1k" V 4950 3400 50  0000 C CNN
+F 0 "R5" V 5050 3650 50  0000 C CNN
+F 1 "1k" V 5000 3500 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4980 3650 50  0001 C CNN
 F 3 "~" H 5050 3650 50  0001 C CNN
 	1    5050 3650
@@ -205,8 +205,8 @@ $Comp
 L Device:R R8
 U 1 1 5AD06BF1
 P 5100 2150
-F 0 "R8" V 5000 2000 50  0000 C CNN
-F 1 "100k" V 5000 2250 50  0000 C CNN
+F 0 "R8" V 5100 2150 50  0000 C CNN
+F 1 "100k" V 5150 2350 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 5030 2150 50  0001 C CNN
 F 3 "~" H 5100 2150 50  0001 C CNN
 	1    5100 2150
@@ -215,7 +215,7 @@ $EndComp
 Wire Wire Line
 	5450 2150 5250 2150
 $Comp
-L pwr:3V3 #PWR0104
+L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR0104
 U 1 1 5AD07D20
 P 8250 1300
 F 0 "#PWR0104" H 8250 1260 30  0001 C CNN
@@ -239,7 +239,7 @@ Wire Wire Line
 Wire Wire Line
 	8150 1400 8250 1400
 $Comp
-L tech-thing:+BATT #PWR0105
+L audi_concert1_chorus1_volume_fix-rescue:+BATT-tech-thing #PWR0105
 U 1 1 5AD0AAB2
 P 5100 2350
 F 0 "#PWR0105" H 5100 2300 20  0001 C CNN
@@ -253,8 +253,8 @@ $Comp
 L Device:R R3
 U 1 1 5AD0B291
 P 5050 3450
-F 0 "R3" V 4950 3300 50  0000 C CNN
-F 1 "100k" V 4950 3550 50  0000 C CNN
+F 0 "R3" V 5050 3450 50  0000 C CNN
+F 1 "100k" V 5100 3650 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4980 3450 50  0001 C CNN
 F 3 "~" H 5050 3450 50  0001 C CNN
 	1    5050 3450
@@ -326,7 +326,7 @@ F 3 "" H 14450 1800 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L pwr:3V3 #PWR0108
+L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR0108
 U 1 1 5AD13143
 P 15100 1100
 F 0 "#PWR0108" H 15100 1060 30  0001 C CNN
@@ -352,7 +352,7 @@ $EndComp
 Wire Wire Line
 	15100 1850 15100 1750
 $Comp
-L pwr:3V3 #PWR0112
+L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR0112
 U 1 1 5AD24857
 P 14450 1050
 F 0 "#PWR0112" H 14450 1010 30  0001 C CNN
@@ -398,7 +398,7 @@ F 3 "~" H 14200 8850 50  0001 C CNN
 	0    -1   -1   0   
 $EndComp
 $Comp
-L pwr:3V3 #PWR0113
+L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR0113
 U 1 1 5AD3B88B
 P 14200 8650
 F 0 "#PWR0113" H 14200 8610 30  0001 C CNN
@@ -451,7 +451,7 @@ Connection ~ 5300 3850
 Wire Wire Line
 	5300 3850 5450 3850
 $Comp
-L Regulator_Linear:AP1117-33 U2
+L audi_concert1_chorus1_volume_fix-rescue:AP1117-33-Regulator_Linear U2
 U 1 1 5AD43D6E
 P 12550 8700
 F 0 "U2" H 12550 8942 50  0000 C CNN
@@ -462,7 +462,7 @@ F 3 "http://www.diodes.com/datasheets/AP1117.pdf" H 12650 8450 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L pwr:5V #PWR06
+L audi_concert1_chorus1_volume_fix-rescue:5V-pwr #PWR06
 U 1 1 5AD447E7
 P 11950 8650
 F 0 "#PWR06" H 11950 8610 30  0001 C CNN
@@ -473,7 +473,7 @@ F 3 "" H 11950 8650 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L c:C C6
+L audi_concert1_chorus1_volume_fix-rescue:C-c C6
 U 1 1 5AD448E2
 P 11950 9000
 F 0 "C6" H 12079 9053 60  0000 L CNN
@@ -484,7 +484,7 @@ F 3 "" H 11950 9000 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L c:C C7
+L audi_concert1_chorus1_volume_fix-rescue:C-c C7
 U 1 1 5AD44AEA
 P 13100 9000
 F 0 "C7" H 13229 9053 60  0000 L CNN
@@ -548,7 +548,7 @@ Wire Wire Line
 	13100 8700 13100 8800
 Connection ~ 13100 8700
 $Comp
-L pwr:3V3 #PWR09
+L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR09
 U 1 1 5AD4F28B
 P 13100 8650
 F 0 "#PWR09" H 13100 8610 30  0001 C CNN
@@ -587,7 +587,7 @@ Wire Wire Line
 Wire Wire Line
 	13600 8700 13100 8700
 $Comp
-L Connectors:CONN_1x6 CON4
+L audi_concert1_chorus1_volume_fix-rescue:CONN_1x6-Connectors CON4
 U 1 1 5AD530B5
 P 1300 1250
 F 0 "CON4" H 1000 750 60  0000 L CNN
@@ -609,7 +609,7 @@ F 3 "" H 1600 1800 50  0001 C CNN
 	-1   0    0    -1  
 $EndComp
 $Comp
-L pwr:3V3 #PWR012
+L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR012
 U 1 1 5AD5527C
 P 2350 1050
 F 0 "#PWR012" H 2350 1010 30  0001 C CNN
@@ -655,7 +655,7 @@ F 3 "~" H 14450 5500 50  0001 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L c:C C4
+L audi_concert1_chorus1_volume_fix-rescue:C-c C4
 U 1 1 5AD6B918
 P 13700 5250
 F 0 "C4" V 13412 5250 60  0000 C CNN
@@ -666,7 +666,7 @@ F 3 "" H 13700 5250 50  0001 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L c:C C5
+L audi_concert1_chorus1_volume_fix-rescue:C-c C5
 U 1 1 5AD6BA52
 P 13700 5800
 F 0 "C5" V 13988 5800 60  0000 C CNN
@@ -751,7 +751,7 @@ F 3 "~" H 14400 4050 50  0001 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L c:C C2
+L audi_concert1_chorus1_volume_fix-rescue:C-c C2
 U 1 1 5AD17506
 P 13650 3800
 F 0 "C2" V 13362 3800 60  0000 C CNN
@@ -762,7 +762,7 @@ F 3 "" H 13650 3800 50  0001 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L c:C C3
+L audi_concert1_chorus1_volume_fix-rescue:C-c C3
 U 1 1 5AD1750D
 P 13650 4350
 F 0 "C3" V 13938 4350 60  0000 C CNN
@@ -841,67 +841,67 @@ OSC32OUT
 Text Label 15100 3800 2    50   ~ 0
 OSC32IN
 Wire Wire Line
-	1500 3800 1700 3800
+	1500 4250 1700 4250
 $Comp
-L pwr:5V #PWR02
+L audi_concert1_chorus1_volume_fix-rescue:5V-pwr #PWR02
 U 1 1 5AD45D86
-P 1700 3250
-F 0 "#PWR02" H 1700 3210 30  0001 C CNN
-F 1 "5V" H 1725 3411 60  0000 C CNN
-F 2 "" H 1700 3250 50  0001 C CNN
-F 3 "" H 1700 3250 50  0001 C CNN
-	1    1700 3250
+P 1700 3700
+F 0 "#PWR02" H 1700 3660 30  0001 C CNN
+F 1 "5V" H 1725 3861 60  0000 C CNN
+F 2 "" H 1700 3700 50  0001 C CNN
+F 3 "" H 1700 3700 50  0001 C CNN
+	1    1700 3700
 	1    0    0    -1  
 $EndComp
 $Comp
 L power:GND #PWR01
 U 1 1 5AD5D404
-P 1650 4600
-F 0 "#PWR01" H 1650 4350 50  0001 C CNN
-F 1 "GND" H 1655 4427 50  0000 C CNN
-F 2 "" H 1650 4600 50  0001 C CNN
-F 3 "" H 1650 4600 50  0001 C CNN
-	1    1650 4600
+P 1650 4550
+F 0 "#PWR01" H 1650 4300 50  0001 C CNN
+F 1 "GND" H 1655 4377 50  0000 C CNN
+F 2 "" H 1650 4550 50  0001 C CNN
+F 3 "" H 1650 4550 50  0001 C CNN
+	1    1650 4550
 	1    0    0    -1  
 $EndComp
 $Comp
 L Device:R R12
 U 1 1 5AD5DB61
-P 1850 3950
-F 0 "R12" V 1750 3850 50  0000 C CNN
-F 1 "20" V 1750 4050 50  0000 C CNN
-F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 1780 3950 50  0001 C CNN
-F 3 "~" H 1850 3950 50  0001 C CNN
-	1    1850 3950
+P 2150 3950
+F 0 "R12" V 2150 3950 50  0000 C CNN
+F 1 "20" V 2200 4100 50  0000 C CNN
+F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 2080 3950 50  0001 C CNN
+F 3 "~" H 2150 3950 50  0001 C CNN
+	1    2150 3950
 	0    1    1    0   
 $EndComp
 $Comp
 L Device:R R13
 U 1 1 5AD5DDB2
-P 1850 4100
-F 0 "R13" V 1750 4200 50  0000 C CNN
-F 1 "20" V 1750 4050 50  0000 C CNN
-F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 1780 4100 50  0001 C CNN
-F 3 "~" H 1850 4100 50  0001 C CNN
-	1    1850 4100
+P 2150 4100
+F 0 "R13" V 2150 4100 50  0000 C CNN
+F 1 "20" V 2100 3950 50  0000 C CNN
+F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 2080 4100 50  0001 C CNN
+F 3 "~" H 2150 4100 50  0001 C CNN
+	1    2150 4100
 	0    -1   -1   0   
 $EndComp
 $Comp
 L Device:R R14
 U 1 1 5AD67C4F
-P 2150 3650
-F 0 "R14" V 2000 3650 50  0000 C CNN
-F 1 "1k5" V 2300 3600 50  0000 C CNN
-F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 2080 3650 50  0001 C CNN
-F 3 "~" H 2150 3650 50  0001 C CNN
-	1    2150 3650
+P 2450 3650
+F 0 "R14" V 2450 3650 50  0000 C CNN
+F 1 "1k5" V 2400 3850 50  0000 C CNN
+F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 2380 3650 50  0001 C CNN
+F 3 "~" H 2450 3650 50  0001 C CNN
+	1    2450 3650
 	-1   0    0    -1  
 $EndComp
 Wire Wire Line
-	2000 3950 2150 3950
-Text Label 2850 3950 2    50   ~ 0
+	2300 3950 2450 3950
+Text Label 3150 3950 2    50   ~ 0
 USB+
-Text Label 2850 4100 2    50   ~ 0
+Text Label 3150 4100 2    50   ~ 0
 USB-
 Wire Wire Line
 	11250 4450 11750 4450
@@ -912,7 +912,7 @@ USB+
 Text Label 11750 4350 2    50   ~ 0
 USB-
 $Comp
-L con:CONN_4 CON2
+L audi_concert1_chorus1_volume_fix-rescue:CONN_4-con CON2
 U 1 1 5ADC7B62
 P 1100 3950
 F 0 "CON2" H 969 3603 60  0000 C CNN
@@ -923,13 +923,13 @@ F 3 "" H 1100 3950 50  0001 C CNN
 	-1   0    0    1   
 $EndComp
 Wire Wire Line
-	1500 4250 1650 4250
+	1500 3800 1650 3800
 Wire Wire Line
-	1700 3950 1500 3950
+	2000 3950 1500 3950
 Wire Wire Line
-	1500 4100 1700 4100
+	1500 4100 2000 4100
 $Comp
-L con:CONN_3 CON3
+L audi_concert1_chorus1_volume_fix-rescue:CONN_3-con CON3
 U 1 1 5ADF8417
 P 1150 5550
 F 0 "CON3" H 1019 5203 60  0000 C CNN
@@ -983,8 +983,8 @@ $Comp
 L Device:R R15
 U 1 1 5AE4CC42
 P 5050 4550
-F 0 "R15" V 4900 4650 50  0000 C CNN
-F 1 "1k" V 4900 4400 50  0000 C CNN
+F 0 "R15" V 5050 4550 50  0000 C CNN
+F 1 "1k" V 5100 4400 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4980 4550 50  0001 C CNN
 F 3 "~" H 5050 4550 50  0001 C CNN
 	1    5050 4550
@@ -994,8 +994,8 @@ $Comp
 L Device:R R16
 U 1 1 5AE4CCFC
 P 5050 4650
-F 0 "R16" V 4900 4750 50  0000 C CNN
-F 1 "1k" V 4900 4500 50  0000 C CNN
+F 0 "R16" V 5050 4650 50  0000 C CNN
+F 1 "1k" V 5100 4500 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4980 4650 50  0001 C CNN
 F 3 "~" H 5050 4650 50  0001 C CNN
 	1    5050 4650
@@ -1005,8 +1005,8 @@ $Comp
 L Device:R R17
 U 1 1 5AE4CD58
 P 5050 4750
-F 0 "R17" V 4900 4850 50  0000 C CNN
-F 1 "1k" V 4900 4600 50  0000 C CNN
+F 0 "R17" V 5050 4750 50  0000 C CNN
+F 1 "1k" V 5100 4600 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4980 4750 50  0001 C CNN
 F 3 "~" H 5050 4750 50  0001 C CNN
 	1    5050 4750
@@ -1044,8 +1044,8 @@ $Comp
 L Device:R R19
 U 1 1 5B26E22F
 P 5050 3750
-F 0 "R19" V 4950 3800 50  0000 C CNN
-F 1 "1k" V 4950 3500 50  0000 C CNN
+F 0 "R19" V 5050 3750 50  0000 C CNN
+F 1 "1k" V 5000 3600 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4980 3750 50  0001 C CNN
 F 3 "~" H 5050 3750 50  0001 C CNN
 	1    5050 3750
@@ -1058,7 +1058,7 @@ Wire Wire Line
 Text Label 5000 9400 0    50   ~ 0
 RESET_KA
 $Comp
-L MCU_ST_STM32:STM32F103C8Tx U3
+L audi_concert1_chorus1_volume_fix-rescue:STM32F103C8Tx-MCU_ST_STM32 U3
 U 1 1 5AFA2F29
 P 8350 3350
 F 0 "U3" H 8350 5328 50  0000 C CNN
@@ -1099,29 +1099,29 @@ Wire Wire Line
 	8450 1400 8350 1400
 Connection ~ 8350 1400
 Wire Wire Line
-	1650 4250 1650 4600
+	1650 3800 1650 4550
 Wire Wire Line
-	2000 4100 2850 4100
+	2300 4100 2850 4100
 Wire Wire Line
-	2150 3800 2150 3950
-Connection ~ 2150 3950
+	2450 3800 2450 3950
+Connection ~ 2450 3950
 Wire Wire Line
-	2150 3950 2850 3950
+	2450 3950 2850 3950
 Wire Wire Line
-	1700 3250 1700 3800
+	1700 3700 1700 4250
 $Comp
-L pwr:3V3 #PWR0115
+L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR0115
 U 1 1 5BA6283C
-P 2150 3250
-F 0 "#PWR0115" H 2150 3210 30  0001 C CNN
-F 1 "3V3" H 2175 3411 60  0000 C CNN
-F 2 "" H 2150 3250 50  0001 C CNN
-F 3 "" H 2150 3250 50  0001 C CNN
-	1    2150 3250
+P 2450 3250
+F 0 "#PWR0115" H 2450 3210 30  0001 C CNN
+F 1 "3V3" H 2475 3411 60  0000 C CNN
+F 2 "" H 2450 3250 50  0001 C CNN
+F 3 "" H 2450 3250 50  0001 C CNN
+	1    2450 3250
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	2150 3250 2150 3500
+	2450 3250 2450 3500
 Wire Wire Line
 	11250 4250 11750 4250
 Wire Wire Line
@@ -1146,7 +1146,7 @@ Connection ~ 13600 1500
 Wire Wire Line
 	13600 1450 13600 1500
 $Comp
-L pwr:3V3 #PWR0110
+L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR0110
 U 1 1 5AD193C1
 P 13600 1050
 F 0 "#PWR0110" H 13600 1010 30  0001 C CNN
@@ -1188,7 +1188,7 @@ Wire Wire Line
 Wire Wire Line
 	13600 1500 13600 1550
 $Comp
-L c:C C1
+L audi_concert1_chorus1_volume_fix-rescue:C-c C1
 U 1 1 5AD16DB5
 P 13600 1750
 F 0 "C1" H 13729 1803 60  0000 L CNN
@@ -1205,7 +1205,7 @@ Wire Wire Line
 Wire Wire Line
 	13350 1600 13350 1500
 $Comp
-L MiscellaneousDevices:SWITCH_DPST SW1
+L audi_concert1_chorus1_volume_fix-rescue:SWITCH_DPST-MiscellaneousDevices SW1
 U 1 1 5AD37DF2
 P 13350 1750
 F 0 "SW1" V 13400 2150 60  0000 R CNN
@@ -1271,10 +1271,10 @@ Wire Notes Line
 Text Notes 13250 750  0    50   ~ 0
 not populated
 $Comp
-L MAX809_810:MAX809 U?
+L MAX809_810:MAX809 U4
 U 1 1 5C3696EF
 P 12550 2750
-F 0 "U?" H 12322 2696 50  0000 R CNN
+F 0 "U4" H 12322 2696 50  0000 R CNN
 F 1 "MAX809" H 12322 2605 50  0000 R CNN
 F 2 "TO_SOT_Packages_SMD.pretty:SOT-23" H 12550 2750 50  0001 C CNN
 F 3 "https://datasheets.maximintegrated.com/en/ds/MAX803-MAX810Z.pdf" H 12550 2750 50  0001 C CNN
@@ -1288,10 +1288,10 @@ Wire Wire Line
 Text Label 11750 2150 0    50   ~ 0
 RESET_MOTO
 $Comp
-L power:GND #PWR?
+L power:GND #PWR014
 U 1 1 5C372543
 P 12500 3500
-F 0 "#PWR?" H 12500 3250 50  0001 C CNN
+F 0 "#PWR014" H 12500 3250 50  0001 C CNN
 F 1 "GND" H 12505 3327 50  0000 C CNN
 F 2 "" H 12500 3500 50  0001 C CNN
 F 3 "" H 12500 3500 50  0001 C CNN
@@ -1321,8 +1321,8 @@ $Comp
 L Device:R R20
 U 1 1 5BE1DE4B
 P 4950 1450
-F 0 "R20" V 4850 1500 50  0000 C CNN
-F 1 "1k" V 4850 1200 50  0000 C CNN
+F 0 "R20" V 4950 1450 50  0000 C CNN
+F 1 "1k" V 4900 1300 50  0000 C CNN
 F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4880 1450 50  0001 C CNN
 F 3 "~" H 4950 1450 50  0001 C CNN
 	1    4950 1450

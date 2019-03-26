@@ -289,8 +289,6 @@ F 3 "~" H 14450 1500 50  0001 C CNN
 	0    -1   -1   0   
 $EndComp
 Wire Wire Line
-	14450 1800 14450 1700
-Wire Wire Line
 	8150 5150 8150 5350
 Wire Wire Line
 	8150 5350 8250 5350
@@ -347,8 +345,6 @@ F 3 "" H 15100 1850 50  0001 C CNN
 	1    15100 1850
 	1    0    0    -1  
 $EndComp
-Wire Wire Line
-	15100 1850 15100 1750
 $Comp
 L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR0112
 U 1 1 5AD24857
@@ -376,18 +372,14 @@ Wire Wire Line
 	5200 3650 5450 3650
 Text Label 15500 1550 2    50   ~ 0
 BOOT0
-Wire Wire Line
-	15500 1550 15250 1550
 Text Label 14850 1500 2    50   ~ 0
 BOOT1
-Wire Wire Line
-	14600 1500 14850 1500
 $Comp
 L Device:LED D1
 U 1 1 5AD3B7A2
 P 14200 8850
 F 0 "D1" V 14238 8732 50  0000 R CNN
-F 1 "red" V 14147 8732 50  0000 R CNN
+F 1 "LED" V 14147 8732 50  0000 R CNN
 F 2 "LEDs.pretty:LED-1206" H 14200 8850 50  0001 C CNN
 F 3 "~" H 14200 8850 50  0001 C CNN
 	1    14200 8850
@@ -895,9 +887,9 @@ F 3 "~" H 2450 3650 50  0001 C CNN
 $EndComp
 Wire Wire Line
 	2300 3950 2450 3950
-Text Label 3150 3950 2    50   ~ 0
+Text Label 2850 3950 2    50   ~ 0
 USB+
-Text Label 3150 4100 2    50   ~ 0
+Text Label 2850 4100 2    50   ~ 0
 USB-
 Wire Wire Line
 	11250 4450 11750 4450
@@ -1203,4 +1195,33 @@ F 3 "" H 13250 950 50  0001 C CNN
 	1    13250 950 
 	1    0    0    -1  
 $EndComp
+Wire Wire Line
+	14450 1700 14450 1800
+Wire Wire Line
+	14600 1500 14850 1500
+Wire Wire Line
+	15250 1550 15500 1550
+Wire Wire Line
+	15100 1750 15100 1850
+Wire Wire Line
+	5750 7550 5200 7550
+Text Label 5200 7550 0    50   ~ 0
+GALA
+Wire Wire Line
+	11250 3250 11400 3250
+$Comp
+L Device:R R?
+U 1 1 5C9B88B9
+P 11550 3250
+F 0 "R?" V 11550 3250 50  0000 C CNN
+F 1 "1k" V 11500 3400 50  0000 C CNN
+F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 11480 3250 50  0001 C CNN
+F 3 "~" H 11550 3250 50  0001 C CNN
+	1    11550 3250
+	0    1    -1   0   
+$EndComp
+Wire Wire Line
+	11700 3250 12350 3250
+Text Label 12350 3250 2    50   ~ 0
+GALA
 $EndSCHEMATC

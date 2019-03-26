@@ -103,6 +103,7 @@ uint8_t serialDebug = 0;
 uint8_t serialDebug2 = 0;
 uint8_t muteIsLegit = 0;
 uint8_t volumeMode = 0;
+
 /*
    functions
 */
@@ -169,7 +170,7 @@ void readCLK();
    clasic setup function
 
 */
-void dump_i2c_data(uint8_t _data[howmanybytesinpacket]);
+void dump_data(uint8_t _data[howmanybytesinpacket]);
 
 void set_mute();
 void set_unmute();
@@ -382,7 +383,7 @@ void set_unmute() {
 
 void set_volume_up() {
   muteIsLegit = 0; //mute = 1; //fix #3
-  if (volumeMode = 0) {
+  if (volumeMode == 0) {
     if (volume > 0xEA) {
       volume = 0xEA;
     } else if (volume > 0xD2) {
@@ -443,10 +444,10 @@ void set_volume_up() {
       volume = 0x10;
     }
   }
-  if (volumeMode = 1) {
+  if (volumeMode == 1) {
     volume = volume - 1;
   }
-  if (volumeMode = 2) {
+  if (volumeMode == 2) {
     volume = volume - 2;
   }
   //max so we do not overflow ...
@@ -516,10 +517,10 @@ void set_volume_down() {
       volume = 0xFF;
     }
   }
-  if (volumeMode = 1) {
+  if (volumeMode == 1) {
     if(volume<=0xFE) volume = volume + 1; //so we do not overflow
   }
-  if (volumeMode = 2) {
+  if (volumeMode == 2) {
     if(volume<=0xFD) volume = volume + 2; //so we do not overflow
   }
 }
@@ -586,9 +587,9 @@ void set_loudness()
   }
 }
 
-void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
+void dump_data(uint8_t _data[howmanybytesinpacket]) {
 
-  if (serialDebug) Serial.print(F("unknown i2c data: "));
+  if (serialDebug) Serial.print(F("unknown data: "));
   for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
     if (serialDebug) Serial.print(_data[i], HEX);
     if (serialDebug) Serial.print(F(" "));
@@ -736,6 +737,9 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
             break;
           case 4:
             if (serialDebug) Serial.println(F("TAPE:  < (FR)"));
+            break;
+          case 5:
+            if (serialDebug) Serial.println(F("CONNECT"));
             break;
           case 0:
             if (serialDebug) Serial.println(F("TAPE: Eject"));
@@ -890,7 +894,7 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       }
   }
   if (dump) {
-    dump_i2c_data(_data);
+    dump_data(_data);
   }
 }
 
@@ -997,8 +1001,6 @@ void sendI2C (uint8_t data[howmanybytesinpacket]) {
   //if (serialDebug) Serial.println();
   // decode_i2c(data);
 }
-
-
 
 void decode_i2c(uint8_t data[howmanybytesinpacket]) {
   uint8_t increments = 1; //at least 1 iteration of next FOR must run...

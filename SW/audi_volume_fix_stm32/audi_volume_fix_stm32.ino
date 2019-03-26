@@ -634,12 +634,12 @@ void dump_data(uint8_t _data[howmanybytesinpacket]) {
 void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
   //  if(_data[1] == 0x13) if (serialDebug) Serial.println(_data[2],BIN); //debug
   uint8_t dump = 0;
+  grab_volume = 1;
   switch (_data[1]) { //switching second byte, which indicate type of packet data
 
     case 0x13:
       //leds: whole packet: 9A 13 2E 0 29 0 0 0 0 0 0 0 0 0 0
       {
-        grab_volume = 1;
         //if (serialDebug) Serial.println(_data[2],BIN);
         if (_data[2] & B00000001) if (serialDebug) Serial.print(F("REG ")); //REG bit
         if (_data[2] & B00000010) if (serialDebug) Serial.print(F("RDS ")); //RDS bit
@@ -677,7 +677,6 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       break;
     case 0x32: //freq?
       {
-        grab_volume = 1;
         if (_data[3] == 0x10) { //AM
           uint16_t freq = 531;
           freq = freq + (_data[2] * 9);
@@ -695,7 +694,6 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       break;
     case 0x48:
       {
-        grab_volume = 1;
         if (serialDebug) Serial.print(F("display data ASCI: "));
         // }
         for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
@@ -709,7 +707,6 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       break;
     case 0x58: //text
       {
-        grab_volume = 0;
         //54 41 20 20 20 35 20 20 0 0 0 0 0
         if (serialDebug) Serial.write(_data[2]);
         if (serialDebug) Serial.write(_data[3]);
@@ -724,7 +721,6 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       break;
     case 0x61:
       {
-        grab_volume = 1;
         switch (_data[2]) {
           case 0x01:
             if (serialDebug) Serial.println(F("TAPE: /\\"));
@@ -793,6 +789,7 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
             }
             break;
           case 0x3:
+            grab_volume = 0;
             if (serialDebug) Serial.print(F("TRE "));
             if ((_data[2] & 0x0F) == 0) {
               if (serialDebug) Serial.println(0);
@@ -848,7 +845,6 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
             break;
           case 0xB:
             {
-              grab_volume = 1;
               //GALA
               if (serialDebug) Serial.print("GALA ");
 
@@ -876,7 +872,6 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       break;
     case 0xA2:
       {
-        grab_volume = 1;
         if (serialDebug) Serial.print(F("CD"));
         if (serialDebug) Serial.print(_data[2], HEX);
         if (serialDebug) Serial.print(F(" TR"));

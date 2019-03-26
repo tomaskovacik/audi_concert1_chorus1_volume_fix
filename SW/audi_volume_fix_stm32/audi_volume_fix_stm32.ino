@@ -103,6 +103,7 @@ uint8_t serialDebug = 0;
 uint8_t serialDebug2 = 0;
 uint8_t muteIsLegit = 0;
 uint8_t volumeMode = 0;
+uint8_t configMode = 0;
 
 /*
    functions
@@ -1340,6 +1341,8 @@ void decode_button_push(uint8_t data) {
       if (serialDebug) Serial.println(F(" Seek < "));
       break;
     case PANEL_REVERSE:
+      if (configMode) volumeMode++;
+      if(volumeMode==3) volumeMode=0;
       if (serialDebug) Serial.println(F(" REV"));
       break;
     case PANEL_KNOB_UP:
@@ -1349,9 +1352,11 @@ void decode_button_push(uint8_t data) {
       if (serialDebug) Serial.println(F(" Knob - "));
       break;
     case PANEL_CODE_IN:
+      configMode = !configMode;
       if (serialDebug) Serial.println(F(" Code in (TP + RDS)"));
       break;
     case PANEL_EJECT:
+      if (configMode) volumeMode=0;
       if (serialDebug) Serial.println(F("eject"));
       break;
     case PANEL_BUTTON_RELEASE:

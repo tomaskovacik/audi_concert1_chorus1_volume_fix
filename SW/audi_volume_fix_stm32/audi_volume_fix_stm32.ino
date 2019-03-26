@@ -456,7 +456,7 @@ void set_volume_up() {
 
 void set_volume_down() {
   muteIsLegit = 0; //mute = 1; //fix #3
-  if (volumeMode = 0) {
+  if (volumeMode == 0) {
     if (volume < 0x14) {
       volume = 0x14;
     } else if (volume < 0x18) {

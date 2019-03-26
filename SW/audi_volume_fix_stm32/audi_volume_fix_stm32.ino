@@ -97,9 +97,12 @@ String VFversion = "1.0";
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
-uint8_t displayRESETstate=0;
+uint8_t displayRESETstate = 0;
 
 uint8_t serialDebug = 0;
+uint8_t serialDebug2 = 0;
+uint8_t muteIsLegit = 0;
+uint8_t volumeMode = 0;
 /*
    functions
 */
@@ -184,10 +187,10 @@ void setup ()
   //master i2c to send data(fixed) to TDA7342
   SWire.begin();
 
-//  for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
-//    volume_packet[i] = 0;
-//    loudness_packet[i] = 0;
-//  }
+  //  for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
+  //    volume_packet[i] = 0;
+  //    loudness_packet[i] = 0;
+  //  }
   //init pins for display SPI
   pinMode(displaySTATUS, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(displaySTATUS), enableInteruptOnCLK, RISING);
@@ -218,7 +221,41 @@ void loop()
         Serial.println("disabled");
       }
     }
-    if (serial_char == 'v') Serial.println(VFversion);
+    if (serial_char == 'D') {
+      Serial.print(F("debug2 output "));
+      if (!serialDebug2) {
+        serialDebug2 = 1;
+        Serial.println("enabled");
+      } else {
+        serialDebug2 = 0;
+        Serial.println("disabled");
+      }
+    }
+    if (serial_char == 'V') {
+      Serial.print(F("Firmware version: "));
+      Serial.println(VFversion);
+      Serial.println(F("(C) kovo, GPL3"));
+      Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
+    }
+    if (serial_char == 'v') {
+      volumeMode++;
+      if (volumeMode > 2)volumeMode = 0;
+      Serial.print(F("Volume mode: "));
+      switch (volumeMode) {
+        case 0:
+          Serial.println(F("original"));
+          break;
+        case 1:
+          Serial.println(F("step 1"));
+          break;
+        case 2:
+          Serial.println(F("step 2"));
+          break;
+        default:
+          volumeMode = 0;
+          Serial.println(F("forced back to original"));
+      }
+    }
   }
   if (digitalRead(displayRESET) && !displayRESETstate) {
     //if (serialDebug) Serial.println("Reset HIGH");
@@ -240,7 +277,8 @@ void loop()
       }
       if (_data[0] == 0x25)//button push
       {
-        decode_button_push(_data[1]); //function which send to if (serialDebug) Serial port real function of pressed button in human language
+        muteIsLegit = 1;//set this for any button push, we later set it to 0 if we change volume, so mute packet are ignored while volume is changed by our 
+        decode_button_push(_data[1]); //function which send to Serial port real function of pressed button in human language
         if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is turn of knob is not  bass/trebble/ballance/fade, we set grab_volume=0 when display shows bass/trebble/ballance/fade)
           set_volume_up();
           set_volume();
@@ -251,6 +289,7 @@ void loop()
         }
       }
       if (_data[0] == 0x9A) { // packet starting with 0x95 is update for pannel, text, indications leds ....
+        muteIsLegit = 1; //any change here is legit for mutting sound = TP for example is indicating only here or in i2c be changing to specific input - Mono one
         decode_display_data(_data);
       }
       drdp++; //after everything increment read pointer
@@ -268,9 +307,28 @@ void loop()
       }
       //volume was set by panel, and is probably f###d :) , only fixing volume packet, subbaddress = ?
       if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {
+        if (serialDebug2) {
+          Serial.println();
+          Serial.println(F("=============================================================================="));
+          Serial.print(F("Volume packet from original MCU, probably wrong: "));
+          decode_i2c(_data);
+          Serial.println(F("=============================================================================="));
+          Serial.println();
+        }
       } else if (_data[1] == 8 ) { //MUTE
+        if (serialDebug2) {
+          Serial.println();
+          Serial.println(F("=============================================================================="));
+          Serial.println();
+          Serial.println(F("MUTE ON I2C"));
+          if (mute) Serial.print(F("MUTE=1"));
+          if (muteIsLegit) Serial.print(F("muteIsLegit = 1"));
+          Serial.println();
+          Serial.println(F("=============================================================================="));
+          Serial.println();
+        }
         if ((_data[2] & B00000001)) {
-          if (!mute) { //we are not already muted
+          if (!mute && muteIsLegit) { //we are not already muted
             mute = 1; //set mute flag
             saved_volume = current_volume;//save current volume
             volume = 0xFF; //set volume to be 0xFF (volume full down,off)
@@ -279,7 +337,7 @@ void loop()
             sendI2C(_data);//but send mute  command out anyway
           }
         } else { //if it's not 1 then it's zero :)
-          if (mute) { //only unmute, if we are not unmuted already
+          if (mute && muteIsLegit) { //only unmute, if we are not unmuted already
             mute = 0; //clear mute flag
             volume = saved_volume;
             //saved_volume = start_volume; //set this to safe value if we fucked something in code, which I probably did :)
@@ -323,129 +381,146 @@ void set_unmute() {
 }
 
 void set_volume_up() {
-  mute = 1; //fix #3
-  if (volume > 0xEA) {
-    volume = 0xEA;
-  } else if (volume > 0xD2) {
-    volume = 0xD2;
-  } else if (volume > 0xBA) {
-    volume = 0xBA;
-  } else if (volume > 0xA2) {
-    volume = 0xA2;
-  } else if (volume > 0x92) {
-    volume = 0x92;
-  } else if (volume > 0x82) {
-    volume = 0x82;
-  } else if (volume > 0x72) {
-    volume = 0x72;
-  } else if (volume > 0x66) {
-    volume = 0x66;
-  } else if (volume > 0x5E) {
-    volume = 0x5E;
-  } else if (volume > 0x5A) {
-    volume = 0x5A;
-  } else if (volume > 0x56) {
-    volume = 0x56;
-  } else if (volume > 0x52) {
-    volume = 0x52;
-  } else if (volume > 0x4E) {
-    volume = 0x4E;
-  } else if (volume > 0x4A) {
-    volume = 0x4A;
-  } else if (volume > 0x46) {
-    volume = 0x46;
-  } else if (volume > 0x42) {
-    volume = 0x42;
-  } else if (volume > 0x3E) { //after this its decrement of 2
-    volume = 0x3E;
-  } else if (volume > 0x3A) {
-    volume = 0x3A;
-  } else if (volume > 0x36) {
-    volume = 0x36;
-  } else if (volume > 0x32) {
-    volume = 0x32;
-  } else if (volume > 0x2E) {
-    volume = 0x2E;
-  } else if (volume > 0x2A) {
-    volume = 0x2A;
-  } else if (volume > 0x26) {
-    volume = 0x26;
-  } else if (volume > 0x22) {
-    volume = 0x22;
-  } else if (volume > 0x1E) {
-    volume = 0x1E;
-  } else if (volume > 0x1A) {
-    volume = 0x1A;
-  } else if (volume > 0x16) {
-    volume = 0x16;
-  } else if (volume > 0x12) {
-    volume = 0x12;
-  } else if (volume > 0x10) {
-    volume = 0x10;
+  muteIsLegit = 0; //mute = 1; //fix #3
+  if (volumeMode = 0) {
+    if (volume > 0xEA) {
+      volume = 0xEA;
+    } else if (volume > 0xD2) {
+      volume = 0xD2;
+    } else if (volume > 0xBA) {
+      volume = 0xBA;
+    } else if (volume > 0xA2) {
+      volume = 0xA2;
+    } else if (volume > 0x92) {
+      volume = 0x92; 
+    } else if (volume > 0x82) {
+      volume = 0x82;
+    } else if (volume > 0x72) {
+      volume = 0x72;
+    } else if (volume > 0x66) {
+      volume = 0x66;
+    } else if (volume > 0x5E) {
+      volume = 0x5E;
+    } else if (volume > 0x5A) {
+      volume = 0x5A;
+    } else if (volume > 0x56) {
+      volume = 0x56;
+    } else if (volume > 0x52) {
+      volume = 0x52;
+    } else if (volume > 0x4E) {
+      volume = 0x4E;
+    } else if (volume > 0x4A) {
+      volume = 0x4A;
+    } else if (volume > 0x46) {
+      volume = 0x46;
+    } else if (volume > 0x42) {
+      volume = 0x42;
+    } else if (volume > 0x3E) { //after this its decrement of 2
+      volume = 0x3E;
+    } else if (volume > 0x3A) {
+      volume = 0x3A;
+    } else if (volume > 0x36) {
+      volume = 0x36;
+    } else if (volume > 0x32) {
+      volume = 0x32;
+    } else if (volume > 0x2E) {
+      volume = 0x2E;
+    } else if (volume > 0x2A) {
+      volume = 0x2A;
+    } else if (volume > 0x26) {
+      volume = 0x26;
+    } else if (volume > 0x22) {
+      volume = 0x22;
+    } else if (volume > 0x1E) {
+      volume = 0x1E;
+    } else if (volume > 0x1A) {
+      volume = 0x1A;
+    } else if (volume > 0x16) {
+      volume = 0x16;
+    } else if (volume > 0x12) {
+      volume = 0x12;
+    } else if (volume > 0x10) {
+      volume = 0x10;
+    }
   }
+  if (volumeMode = 1) {
+    volume = volume - 1;
+  }
+  if (volumeMode = 2) {
+    volume = volume - 2;
+  }
+  //max so we do not overflow ...
   if (volume < 0x10) volume = 0x10; //top volume, seen on original comunication was never less then 0x10
 }
 
 void set_volume_down() {
-  mute = 1; //fix #3
-  if (volume < 0x14) {
-    volume = 0x14;
-  } else if (volume < 0x18) {
-    volume = 0x18;//+4
-  } else if (volume < 0x1C) {
-    volume = 0x1C;//+4
-  } else if (volume < 0x20) {
-    volume = 0x20;//+4
-  } else if (volume < 0x24) {
-    volume = 0x24;//+4
-  } else if (volume < 0x28) {
-    volume = 0x28;//+4
-  } else if (volume < 0x2C) {
-    volume = 0x2C;//+4
-  } else if (volume < 0x30) {
-    volume = 0x30;//+4
-  } else if (volume < 0x34) {
-    volume = 0x34;//+4
-  } else if (volume < 0x38) {
-    volume = 0x38;//+4
-  } else if (volume < 0x3C) {
-    volume = 0x3C;//+4
-  } else if (volume < 0x40) {
-    volume = 0x40;//+4
-  } else if (volume < 0x44) {
-    volume = 0x44;//+4
-  } else if (volume < 0x48) {
-    volume = 0x48;//+4
-  } else if (volume < 0x4C) {
-    volume = 0x4C;//+4
-  } else if (volume < 0x50) {
-    volume = 0x50;//+4
-  } else if (volume < 0x54) {
-    volume = 0x54;//+4
-  } else if (volume < 0x58) {
-    volume = 0x58;//+4
-  } else if (volume < 0x5C) {
-    volume = 0x5C;//+4
-  } else if (volume < 0x60) {
-    volume = 0x60;//+4
-  } else if (volume < 0x68) {
-    volume = 0x68;//+8
-  } else if (volume < 0x74) {
-    volume = 0x74;//+12
-  } else if (volume < 0x84) {
-    volume = 0x84;//+16
-  } else if (volume < 0x94) {
-    volume = 0x94;//+16
-  } else if (volume < 0xA4) {
-    volume = 0xA4;//+16
-  } else if (volume < 0xBE) {
-    volume = 0xBE;
-  } else if (volume < 0xD6) {
-    volume = 0xD6;
-  } else if (volume < 0xEE) {
-    volume = 0xEE;
-  } else if (volume < 0xFF) {
-    volume = 0xFF;
+  muteIsLegit = 0; //mute = 1; //fix #3
+  if (volumeMode = 0) {
+    if (volume < 0x14) {
+      volume = 0x14;
+    } else if (volume < 0x18) {
+      volume = 0x18;//+4
+    } else if (volume < 0x1C) {
+      volume = 0x1C;//+4
+    } else if (volume < 0x20) {
+      volume = 0x20;//+4
+    } else if (volume < 0x24) {
+      volume = 0x24;//+4
+    } else if (volume < 0x28) {
+      volume = 0x28;//+4
+    } else if (volume < 0x2C) {
+      volume = 0x2C;//+4
+    } else if (volume < 0x30) {
+      volume = 0x30;//+4
+    } else if (volume < 0x34) {
+      volume = 0x34;//+4
+    } else if (volume < 0x38) {
+      volume = 0x38;//+4
+    } else if (volume < 0x3C) {
+      volume = 0x3C;//+4
+    } else if (volume < 0x40) {
+      volume = 0x40;//+4
+    } else if (volume < 0x44) {
+      volume = 0x44;//+4
+    } else if (volume < 0x48) {
+      volume = 0x48;//+4
+    } else if (volume < 0x4C) {
+      volume = 0x4C;//+4
+    } else if (volume < 0x50) {
+      volume = 0x50;//+4
+    } else if (volume < 0x54) {
+      volume = 0x54;//+4
+    } else if (volume < 0x58) {
+      volume = 0x58;//+4
+    } else if (volume < 0x5C) {
+      volume = 0x5C;//+4
+    } else if (volume < 0x60) {
+      volume = 0x60;//+4
+    } else if (volume < 0x68) {
+      volume = 0x68;//+8
+    } else if (volume < 0x74) {
+      volume = 0x74;//+12
+    } else if (volume < 0x84) {
+      volume = 0x84;//+16
+    } else if (volume < 0x94) {
+      volume = 0x94;//+16
+    } else if (volume < 0xA4) {
+      volume = 0xA4;//+16
+    } else if (volume < 0xBE) {
+      volume = 0xBE;
+    } else if (volume < 0xD6) {
+      volume = 0xD6;
+    } else if (volume < 0xEE) {
+      volume = 0xEE;
+    } else if (volume < 0xFF) {
+      volume = 0xFF;
+    }
+  }
+  if (volumeMode = 1) {
+    if(volume<=0xFE) volume = volume + 1; //so we do not overflow
+  }
+  if (volumeMode = 2) {
+    if(volume<=0xFD) volume = volume + 2; //so we do not overflow
   }
 }
 /*
@@ -513,7 +588,7 @@ void set_loudness()
 
 void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
 
-  if (serialDebug) Serial.print(F("unknown display data: "));
+  if (serialDebug) Serial.print(F("unknown i2c data: "));
   for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
     if (serialDebug) Serial.print(_data[i], HEX);
     if (serialDebug) Serial.print(F(" "));

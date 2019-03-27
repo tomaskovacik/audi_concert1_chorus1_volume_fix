@@ -801,6 +801,7 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
             dump = 1;
         }
       }
+	break;
     case 0x80:
       {
         if (_data[2] == 0x00) Serial.println(F("Shutdown"));

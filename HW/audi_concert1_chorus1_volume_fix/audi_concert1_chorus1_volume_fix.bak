@@ -1203,4 +1203,25 @@ Wire Wire Line
 	15250 1550 15500 1550
 Wire Wire Line
 	15100 1750 15100 1850
+Wire Wire Line
+	5750 7550 5200 7550
+Text Label 5200 7550 0    50   ~ 0
+GALA
+Wire Wire Line
+	11250 3250 11400 3250
+$Comp
+L Device:R R?
+U 1 1 5C9B88B9
+P 11550 3250
+F 0 "R?" V 11550 3250 50  0000 C CNN
+F 1 "1k" V 11500 3400 50  0000 C CNN
+F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 11480 3250 50  0001 C CNN
+F 3 "~" H 11550 3250 50  0001 C CNN
+	1    11550 3250
+	0    1    -1   0   
+$EndComp
+Wire Wire Line
+	11700 3250 12350 3250
+Text Label 12350 3250 2    50   ~ 0
+GALA
 $EndSCHEMATC

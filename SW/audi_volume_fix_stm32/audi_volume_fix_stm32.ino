@@ -681,6 +681,9 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
           case 0x10:
             if (serialDebug) Serial.println(F("TP-INFO"));
             break;
+          case 0x11:
+            if (serialDebug) Serial.println(F("TELEFON"));
+            break;
           case 0x0B:
             if (serialDebug) Serial.println(F("SAFE"));
             break;

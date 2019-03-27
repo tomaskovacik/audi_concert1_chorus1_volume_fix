@@ -100,10 +100,6 @@ uint8_t loudness_packet[howmanybytesinpacket];
 uint8_t displayRESETstate = 0;
 
 uint8_t serialDebug = 0;
-uint8_t serialDebug2 = 0;
-uint8_t muteIsLegit = 0;
-uint8_t volumeMode = 0;
-uint8_t configMode = 0;
 
 /*
    functions
@@ -239,25 +235,6 @@ void loop()
       Serial.println(F("(C) kovo, GPL3"));
       Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
     }
-    if (serial_char == 'v') {
-      volumeMode++;
-      if (volumeMode > 2)volumeMode = 0;
-      Serial.print(F("Volume mode: "));
-      switch (volumeMode) {
-        case 0:
-          Serial.println(F("original"));
-          break;
-        case 1:
-          Serial.println(F("step 1"));
-          break;
-        case 2:
-          Serial.println(F("step 2"));
-          break;
-        default:
-          volumeMode = 0;
-          Serial.println(F("forced back to original"));
-      }
-    }
   }
   if (digitalRead(displayRESET) && !displayRESETstate) {
     //if (serialDebug) Serial.println("Reset HIGH");
@@ -279,7 +256,6 @@ void loop()
       }
       if (_data[0] == 0x25)//button push
       {
-        muteIsLegit = 1;//set this for any button push, we later set it to 0 if we change volume, so mute packet are ignored while volume is changed by our 
         decode_button_push(_data[1]); //function which send to Serial port real function of pressed button in human language
         if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is turn of knob is not  bass/trebble/ballance/fade, we set grab_volume=0 when display shows bass/trebble/ballance/fade)
           set_volume_up();
@@ -291,7 +267,6 @@ void loop()
         }
       }
       if (_data[0] == 0x9A) { // packet starting with 0x95 is update for pannel, text, indications leds ....
-        muteIsLegit = 1; //any change here is legit for mutting sound = TP for example is indicating only here or in i2c be changing to specific input - Mono one
         decode_display_data(_data);
       }
       drdp++; //after everything increment read pointer
@@ -309,28 +284,9 @@ void loop()
       }
       //volume was set by panel, and is probably f###d :) , only fixing volume packet, subbaddress = ?
       if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {
-        if (serialDebug2) {
-          Serial.println();
-          Serial.println(F("=============================================================================="));
-          Serial.print(F("Volume packet from original MCU, probably wrong: "));
-          decode_i2c(_data);
-          Serial.println(F("=============================================================================="));
-          Serial.println();
-        }
       } else if (_data[1] == 8 ) { //MUTE
-        if (serialDebug2) {
-          Serial.println();
-          Serial.println(F("=============================================================================="));
-          Serial.println();
-          Serial.println(F("MUTE ON I2C"));
-          if (mute) Serial.print(F("MUTE=1"));
-          if (muteIsLegit) Serial.print(F("muteIsLegit = 1"));
-          Serial.println();
-          Serial.println(F("=============================================================================="));
-          Serial.println();
-        }
         if ((_data[2] & B00000001)) {
-          if (!mute && muteIsLegit) { //we are not already muted
+          if (!mute) { //we are not already muted
             mute = 1; //set mute flag
             saved_volume = current_volume;//save current volume
             volume = 0xFF; //set volume to be 0xFF (volume full down,off)
@@ -339,7 +295,7 @@ void loop()
             sendI2C(_data);//but send mute  command out anyway
           }
         } else { //if it's not 1 then it's zero :)
-          if (mute && muteIsLegit) { //only unmute, if we are not unmuted already
+          if (mute) { //only unmute, if we are not unmuted already
             mute = 0; //clear mute flag
             volume = saved_volume;
             //saved_volume = start_volume; //set this to safe value if we fucked something in code, which I probably did :)
@@ -383,8 +339,6 @@ void set_unmute() {
 }
 
 void set_volume_up() {
-  muteIsLegit = 0; //mute = 1; //fix #3
-  if (volumeMode == 0) {
     if (volume > 0xEA) {
       volume = 0xEA;
     } else if (volume > 0xD2) {
@@ -444,20 +398,10 @@ void set_volume_up() {
     } else if (volume > 0x10) {
       volume = 0x10;
     }
-  }
-  if (volumeMode == 1) {
-    volume = volume - 1;
-  }
-  if (volumeMode == 2) {
-    volume = volume - 2;
-  }
-  //max so we do not overflow ...
   if (volume < 0x10) volume = 0x10; //top volume, seen on original comunication was never less then 0x10
 }
 
 void set_volume_down() {
-  muteIsLegit = 0; //mute = 1; //fix #3
-  if (volumeMode == 0) {
     if (volume < 0x14) {
       volume = 0x14;
     } else if (volume < 0x18) {
@@ -517,13 +461,6 @@ void set_volume_down() {
     } else if (volume < 0xFF) {
       volume = 0xFF;
     }
-  }
-  if (volumeMode == 1) {
-    if(volume<=0xFE) volume = volume + 1; //so we do not overflow
-  }
-  if (volumeMode == 2) {
-    if(volume<=0xFD) volume = volume + 2; //so we do not overflow
-  }
 }
 /*
 
@@ -1341,8 +1278,6 @@ void decode_button_push(uint8_t data) {
       if (serialDebug) Serial.println(F(" Seek < "));
       break;
     case PANEL_REVERSE:
-      if (configMode) volumeMode++;
-      if(volumeMode==3) volumeMode=0;
       if (serialDebug) Serial.println(F(" REV"));
       break;
     case PANEL_KNOB_UP:
@@ -1352,11 +1287,9 @@ void decode_button_push(uint8_t data) {
       if (serialDebug) Serial.println(F(" Knob - "));
       break;
     case PANEL_CODE_IN:
-      configMode = !configMode;
       if (serialDebug) Serial.println(F(" Code in (TP + RDS)"));
       break;
     case PANEL_EJECT:
-      if (configMode) volumeMode=0;
       if (serialDebug) Serial.println(F("eject"));
       break;
     case PANEL_BUTTON_RELEASE:

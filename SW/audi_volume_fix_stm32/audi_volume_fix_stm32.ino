@@ -308,8 +308,6 @@ void loop()
                     }
         }
       } else if (_data[1] == 0x3 && _data[2] == 0xFF && grab_volume == 1) { //bass/treble must be ignored if we are seting volume, because main MCU will send it even wron volume is set
-        dump_data(_data);
-        Serial.println(grab_volume);
         if (serialDebug) Serial.println("Ignored bass/trebble settings from orig MCU!");
       } else {
         sendI2C(_data);

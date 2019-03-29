@@ -80,7 +80,7 @@ volatile uint8_t drdp = 0; //display read data pointer for front panel comunicat
 volatile uint8_t start_volume = 0x82;
 
 volatile uint8_t volume = start_volume; //set start volume here ...
-volatile uint8_t current_volume = start_volume; //set start volume here ..
+volatile uint8_t current_volume = 0xFF; //set start volume here ..
 volatile uint8_t saved_volume = start_volume; //set start volume here .. 0xFF to be sure, not fucked up repro ......
 
 volatile uint8_t start_loudness = 0x0E;
@@ -90,7 +90,7 @@ volatile uint8_t current_loudness = start_loudness; //start loudness : OFF
 
 volatile uint8_t grab_volume = 1;
 
-volatile uint8_t mute = 0;
+volatile uint8_t mute = 1;
 
 String VFversion = "1.0";
 
@@ -238,13 +238,15 @@ void loop()
     }
   }
   if (digitalRead(displayRESET) && !displayRESETstate) {
-    //if (serialDebug) Serial.println("Reset HIGH");
+    if (serialDebug) Serial.println("Reset HIGH");
     displayRESETstate = 1;
+    //mute=1;
   }
   if (!digitalRead(displayRESET) && displayRESETstate) {
     //if (serialDebug) Serial.println("Reset LOW");
     displayRESETstate = 0;
     drdp = dwdp = drdp = 0;
+    mute=1;
   }
   if (!grabing_SPI) { //no data are send on SPI line
     while (drdp != dwdp) { //reading and writing pointers are not in sync, we have some data which should be analyzed
@@ -328,7 +330,7 @@ void loop()
 */
 void set_mute() {
   if (!mute) {
-    mute = 1;
+    //mute = 1;
     uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     sendI2C(mute_data);
   }

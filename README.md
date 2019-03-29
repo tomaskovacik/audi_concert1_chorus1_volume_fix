@@ -5,14 +5,14 @@ know issues <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volum
 
 Schematics:
 
-<img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/9e00c9a2b6ebaae502b4e7f6c2973995be0e9a08/HW/standalone/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.png">
+<img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/9e00c9a2b6ebaae502b4e7f6c2973995be0e9a08/HW/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.png">
 
 
-Schematics in <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/master/HW/standalone/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.pdf">pdf</a>.
+Schematics in <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/master/HW/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.pdf">pdf</a>.
 
 Assemble plan:
 
-<img src="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/raw/master/HW/standalone/audi_concert1_chorus1_volume_fix/assemble_plan_V1.0.png">
+<img src="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/raw/master/HW/audi_concert1_chorus1_volume_fix/assemble_plan_V1.0.png">
 
 
 Pictures of finished product:

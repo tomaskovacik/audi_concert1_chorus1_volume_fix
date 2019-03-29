@@ -5,7 +5,9 @@ know issues <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volum
 
 Schematics:
 
-<img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/9e00c9a2b6ebaae502b4e7f6c2973995be0e9a08/HW/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.png">
+<img src="
+https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/devel/HW/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.png
+">
 
 
 Schematics in <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/master/HW/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.pdf">pdf</a>.

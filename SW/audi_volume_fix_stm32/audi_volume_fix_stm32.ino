@@ -330,7 +330,7 @@ void loop()
 */
 void set_mute() {
   if (!mute) {
-    //mute = 1;
+    mute = 1;
     uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     sendI2C(mute_data);
   }
@@ -953,6 +953,7 @@ void decode_i2c(uint8_t data[howmanybytesinpacket]) {
           switch (c & B0000111) {
             case 1:
               input = TAPE;
+              muteVolume(55);
               if (serialDebug) Serial.println(F("TAPE selected (IN2)"));
               break;
             case 2:

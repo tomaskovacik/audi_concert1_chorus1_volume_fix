@@ -587,6 +587,7 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
 void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
   //  if(_data[1] == 0x13) Serial.println(_data[2],BIN); //debug
   uint8_t dump = 0;
+   grab_volume = 1;
   switch (_data[1]) { //switching second byte, which indicate type of packet data
 
     case 0x13:

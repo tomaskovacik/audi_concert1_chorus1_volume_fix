@@ -96,7 +96,7 @@ volatile uint8_t mute = 0;
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
-uint8_t displayRESETstate=0;
+uint8_t displayRESETstate = 0;
 /*
    functions
 */
@@ -180,11 +180,11 @@ void setup ()
   Wire.onReceive (receiveEvent);
   //master i2c to send data(fixed) to TDA7342
   SWire.begin();
-  
-//  for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
-//    volume_packet[i] = 0;
-//    loudness_packet[i] = 0;
-//  }
+
+  //  for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
+  //    volume_packet[i] = 0;
+  //    loudness_packet[i] = 0;
+  //  }
   //init pins for display SPI
   pinMode(displaySTATUS, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(displaySTATUS), enableInteruptOnCLK, RISING);
@@ -203,14 +203,23 @@ void setup ()
 
 void loop()
 {
-  if (digitalRead(displayRESET) && !displayRESETstate){
-    Serial.println("Reset HIGH");
-    displayRESETstate=1;
+  if (Serial.available()) {
+    if (serial_char == 'v') {
+      Serial.print(F("Firmware version: "));
+      Serial.println("1.0+4.4.19);
+      Serial.println(F("(C) kovo, GPL3"));
+      Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
+      Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
+    }
   }
-  if (!digitalRead(displayRESET) && displayRESETstate){
+  if (digitalRead(displayRESET) && !displayRESETstate) {
+    Serial.println("Reset HIGH");
+    displayRESETstate = 1;
+  }
+  if (!digitalRead(displayRESET) && displayRESETstate) {
     Serial.println("Reset LOW");
-    displayRESETstate=0;
-    drdp = dwdp = drdp = 0;
+    displayRESETstate = 0;
+    wdp = rdp = dwdp = drdp = 0;
   }
   if (!grabing_SPI) { //no data are send on SPI line
     while (drdp != dwdp) { //reading and writing pointers are not in sync, we have some data which should be analyzed
@@ -321,7 +330,7 @@ void set_unmute() {
 }
 
 void set_volume_up() {
-  mute=1; //fix #3
+  mute = 1; //fix #3
   // volume, 0xFF=off, 0x00=full on
   // if (volume == 0xFF) set_unmute();
   if (volume > 0xEA) {
@@ -387,7 +396,7 @@ void set_volume_up() {
 }
 
 void set_volume_down() {
-  mute=1; //fix #3
+  mute = 1; //fix #3
   if (volume < 0x14) {
     volume = 0x14;
   } else if (volume < 0x18) {
@@ -475,18 +484,18 @@ void set_volume() {
       set_loudness();
       sendI2C(volume_packet);
     }
-    
+
     delay(1);
 
-//    Serial.println("=================== after fix ====================");
-//    Serial.print("current volume: "); Serial.println(current_volume, HEX);
-//    Serial.print("volume: "); Serial.println(volume, HEX);
-//    Serial.print("saved volume: "); Serial.println(saved_volume, HEX);
-//    Serial.print("current loudness: "); Serial.println(current_loudness, HEX);
-//    Serial.print("Loudness: "); Serial.println(loudness, HEX);
-//    if (mute) Serial.println("Muted");
-//    else Serial.println("Unmuted");
-//    Serial.println("====================================================");
+    //    Serial.println("=================== after fix ====================");
+    //    Serial.print("current volume: "); Serial.println(current_volume, HEX);
+    //    Serial.print("volume: "); Serial.println(volume, HEX);
+    //    Serial.print("saved volume: "); Serial.println(saved_volume, HEX);
+    //    Serial.print("current loudness: "); Serial.println(current_loudness, HEX);
+    //    Serial.print("Loudness: "); Serial.println(loudness, HEX);
+    //    if (mute) Serial.println("Muted");
+    //    else Serial.println("Unmuted");
+    //    Serial.println("====================================================");
   }
 
   if (volume == 0xFF) set_mute();
@@ -801,7 +810,7 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
             dump = 1;
         }
       }
-	break;
+      break;
     case 0x80:
       {
         if (_data[2] == 0x00) Serial.println(F("Shutdown"));
@@ -931,9 +940,9 @@ void sendI2C (uint8_t data[howmanybytesinpacket]) {
 
   for (byte i = 0 ; i < data[0]; i++) {
     //i2c_write(data[i + 1]);
-    while (!SWire.write(data[i + 1])){
+    while (!SWire.write(data[i + 1])) {
       delay(10);
-      }              // sends one byte
+    }              // sends one byte
 
     //Serial.print(data[i + 1], HEX);
     //Serial.print(F(" ");

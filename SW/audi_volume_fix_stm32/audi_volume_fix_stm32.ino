@@ -204,9 +204,10 @@ void setup ()
 void loop()
 {
   if (Serial.available()) {
+    char serial_char = Serial.read();
     if (serial_char == 'v') {
       Serial.print(F("Firmware version: "));
-      Serial.println("1.0+4.4.19);
+      Serial.println("1.0+4.4.19");
       Serial.println(F("(C) kovo, GPL3"));
       Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
       Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));

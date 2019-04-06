@@ -745,6 +745,7 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
             }
             break;
           case 0x3:
+            grab_volume = 0;
             Serial.print(F("TRE "));
             if ((_data[2] & 0x0F) == 0) {
               Serial.println(0);

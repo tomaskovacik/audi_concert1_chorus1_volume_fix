@@ -236,7 +236,7 @@ void loop()
       {
         decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
         Serial.println();
-        if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/trebble/ballance/fade, we set grab_volume=0 when display shows bass/trebble/ballance/fade)
+        if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
           set_volume_up();
           set_volume();
         }
@@ -1093,8 +1093,8 @@ void decode_i2c(uint8_t data[howmanybytesinpacket]) {
               Serial.print(2);
               break;
           }
-          Serial.print(F("dB, Trebble: "));
-          //trebble
+          Serial.print(F("dB, Treble: "));
+          //treble
           switch (c & 0xF) {
             case 0:
               Serial.print(18);
@@ -1247,7 +1247,7 @@ void decode_button_push(uint8_t data) {
       Serial.println(F(" 6"));
       break;
     case PANEL_SEEK_UP:
-      Serial.println(F(" seek > "));
+      Serial.println(F(" Seek > "));
       break;
     case PANEL_TP:
       Serial.println(F(" TP"));
@@ -1262,7 +1262,7 @@ void decode_button_push(uint8_t data) {
       Serial.println(F(" MODE"));
       break;
     case PANEL_RD:
-      Serial.println(F(" RD(ranodm ? )"));
+      Serial.println(F(" RD(random ? )"));
       break;
     case PANEL_PREVIOUS_TRACK:
       Serial.println(F(" << "));
@@ -1319,7 +1319,7 @@ void decode_button_push(uint8_t data) {
       Serial.println(F("button release"));
       break;
     default:
-      Serial.print(F(" uknown")); Serial.println(data, HEX);
+      Serial.print(F(" unknown")); Serial.println(data, HEX);
       break;
   }
 }

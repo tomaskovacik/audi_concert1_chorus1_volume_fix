@@ -246,7 +246,7 @@ void loop()
   if (!digitalRead(displayRESET) && displayRESETstate) {
     //if (serialDebug) Serial.println("Reset LOW");
     displayRESETstate = 0;
-    drdp = dwdp = 0;
+    wdp = rdp = dwdp = drdp = 0;
     //mute=1;
     muteVolume(0);
   }

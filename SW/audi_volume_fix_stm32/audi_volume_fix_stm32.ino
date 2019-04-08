@@ -246,7 +246,7 @@ void loop()
   if (!digitalRead(displayRESET) && displayRESETstate) {
     //if (serialDebug) Serial.println("Reset LOW");
     displayRESETstate = 0;
-    drdp = dwdp = drdp = 0;
+    drdp = dwdp = 0;
     //mute=1;
     muteVolume(0);
   }
@@ -262,7 +262,7 @@ void loop()
       if (_data[0] == 0x25)//button push
       {
         decode_button_push(_data[1]); //function which send to Serial port real function of pressed button in human language
-        if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is turn of knob is not  bass/trebble/ballance/fade, we set grab_volume=0 when display shows bass/trebble/ballance/fade)
+        if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is turn of knob is not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
           setVolumeUp();
           setVolume();
         }
@@ -312,7 +312,7 @@ void loop()
                     }
         }
       } else if (_data[1] == 0x3 && _data[2] == 0xFF && grab_volume == 1) { //bass/treble must be ignored if we are seting volume, because main MCU will send it even wron volume is set
-        if (serialDebug) Serial.println("Ignored bass/trebble settings from orig MCU!");
+        if (serialDebug) Serial.println("Ignored bass/treble settings from orig MCU!");
       } else {
         sendI2C(_data);
       }
@@ -1082,8 +1082,8 @@ void decode_i2c(uint8_t data[howmanybytesinpacket]) {
               if (serialDebug) Serial.print(2);
               break;
           }
-          if (serialDebug) Serial.print(F("dB, Trebble: "));
-          //trebble
+          if (serialDebug) Serial.print(F("dB, Treble: "));
+          //treble
           switch (c & 0xF) {
             case 0:
               if (serialDebug) Serial.print(18);
@@ -1243,7 +1243,7 @@ void decode_button_push(uint8_t data) {
       break;
     case PANEL_SEEK_UP:
       if (input == RADIO) muteVolume(13); //not sure
-      if (serialDebug) Serial.println(F(" seek > "));
+      if (serialDebug) Serial.println(F(" Seek > "));
       break;
     case PANEL_TP:
       //if (input==RADIO|CDCHANGER|TAPE) muteVolume(14);
@@ -1260,7 +1260,7 @@ void decode_button_push(uint8_t data) {
       if (serialDebug) Serial.println(F(" MODE"));
       break;
     case PANEL_RD:
-      if (serialDebug) Serial.println(F(" RD(ranodm ? )"));
+      if (serialDebug) Serial.println(F(" RD(random ? )"));
       break;
     case PANEL_PREVIOUS_TRACK:
       if (input == TAPE) muteVolume(16); //not sure
@@ -1322,7 +1322,7 @@ void decode_button_push(uint8_t data) {
       if (serialDebug) Serial.println(F("button release"));
       break;
     default:
-      if (serialDebug) Serial.print(F(" uknown")); if (serialDebug) Serial.println(data, HEX);
+      if (serialDebug) Serial.print(F(" unknown")); if (serialDebug) Serial.println(data, HEX);
       break;
   }
 }

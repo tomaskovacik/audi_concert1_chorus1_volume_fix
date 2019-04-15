@@ -94,7 +94,7 @@ volatile uint8_t grab_volume = 1;
 
 volatile uint8_t mute = 0;
 
-String VFversion = "1.0";
+String VFversion = "1.0-devel-15.april 2019";
 
 uint8_t volumePacket[howmanybytesinpacket];
 uint8_t loudnessPacket[howmanybytesinpacket];

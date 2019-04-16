@@ -99,6 +99,7 @@ uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
 uint8_t displayRESETstate = 0;
+uint8_t dumpI2cDataAndDoNotFix = 0;
 /*
    functions
 */
@@ -213,7 +214,10 @@ void loop()
       Serial.println(F("(C) kovo, GPL3"));
       Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
       Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
+      Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
     }
+    if (serial_char == 'D')
+      dumpI2cDataAndDoNotFix = !dumpI2cDataAndDoNotFix;
   }
   if (digitalRead(displayRESET) && !displayRESETstate) {
     Serial.println("Reset HIGH");
@@ -237,14 +241,15 @@ void loop()
       if (_data[0] == 0x25)//button push
       {
         decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
-        Serial.println();
-        if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
-          set_volume_up();
-          set_volume();
-        }
-        if (grab_volume == 1 && _data[1] == 0x88) { //some as previous but nob goes down
-          set_volume_down();
-          set_volume();
+        if (!dumpI2cDataAndDoNotFix) {
+          if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
+            set_volume_up();
+            set_volume();
+          }
+          if (grab_volume == 1 && _data[1] == 0x88) { //some as previous but nob goes down
+            set_volume_down();
+            set_volume();
+          }
         }
       }
       if (_data[0] == 0x9A) { // packet starting with 0x95 is update for pannel, text, indications leds ....
@@ -267,39 +272,43 @@ void loop()
         //Serial.print(_data[i],HEX); Serial.print(" ");
       }
       //Serial.println();
+      if (!dumpI2cDataAndDoNotFix) {
+        if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {//volume was set by panel, and is probably fucked :) , only fixing volume packet, subbaddress = ?
+          Serial.println(F("volume or loudness IGNORING!"));
+          //set_volume();
+        } else if (_data[1] == 8 ) { //MUTE
+          Serial.println(F("MUTE "));
+          if ((_data[2] & B00000001)) {
+            //2 8 81
+            //Serial.println(F("Muting")); dump_i2c_data(_data);
+            if (!mute) { //we are not already muted
+              mute = 1; //set mute flag
+              saved_volume = current_volume;//save current volume
+              volume = 0xFF; //set volume to be 0xFF (volume full down,off)
+              set_volume();//set new volume
+              delay(5);//to be sure? should check this on scope,
+            }
+            sendI2C(_data);//but send mute  command out anyway
+          } else { //if it's not 1 then it's zero :)
+            //2 8 80
+            //Serial.println(F("Unmuting")); dump_i2c_data(_data);
 
-      // Serial.println(F("array copied, sending to TDA");
-      if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {//volume was set by panel, and is probably fucked :) , only fixing volume packet, subbaddress = ?
-        //Serial.println(F("volume or loudness"));
-        //set_volume();
-      } else if (_data[1] == 8 ) { //MUTE
-        //Serial.println(F("MUTE "));
-        if ((_data[2] & B00000001)) {
-          //2 8 81
-          //Serial.println(F("Muting")); dump_i2c_data(_data);
-          if (!mute) { //we are not already muted
-            mute = 1; //set mute flag
-            saved_volume = current_volume;//save current volume
-            volume = 0xFF; //set volume to be 0xFF (volume full down,off)
-            set_volume();//set new volume
-            delay(5);//to be sure? should check this on scope,
+            if (mute) { //only unmute, if we are not unmuted already
+              mute = 0; //clear mute flag
+              volume = saved_volume;
+              //saved_volume = start_volume; //set this to safe value if we fucked something in code, which I probably did :)
+              set_volume();
+            }
+            sendI2C(_data);//send unmute command out before volume set
           }
-          sendI2C(_data);//but send mute  command out anyway
-        } else { //if it's not 1 then it's zero :)
-          //2 8 80
-          //Serial.println(F("Unmuting")); dump_i2c_data(_data);
-
-          if (mute) { //only unmute, if we are not unmuted already
-            mute = 0; //clear mute flag
-            volume = saved_volume;
-            //saved_volume = start_volume; //set this to safe value if we fucked something in code, which I probably did :)
-            set_volume();
-          }
-          sendI2C(_data);//send unmute command out before volume set
+        } else {
+          sendI2C(_data);
         }
-      } else {
-        sendI2C(_data);
+      } else { //dumpI2cDataAndDoNotFix - we are gonna just dump data
+        Serial.print(millis()+String(" [")); dump_i2c_data(_data); Serial.print(F("] "));
+        sendI2C(_data); 
       }
+
 
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
         data[rdp][i] = 0;
@@ -589,7 +598,7 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
 void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
   //  if(_data[1] == 0x13) Serial.println(_data[2],BIN); //debug
   uint8_t dump = 0;
-   grab_volume = 1;
+  grab_volume = 1;
   switch (_data[1]) { //switching second byte, which indicate type of packet data
 
     case 0x13:

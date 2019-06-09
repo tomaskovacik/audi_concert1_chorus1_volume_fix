@@ -1,4 +1,4 @@
-Software and hardware to fix volume problem on audi concert1/chorus1 units made by blaupunkt.
+Software and hardware to fix volume problem on audi concert1/chorus1 units made by blaupunkt. More about this issue in [this](https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/wiki/Problem-of-Some-AUDI-Chorus-and-AUDI-Concert-Autoradio-Models,-or-%22Delayed-Action-Mine%22-from-Blaupunkt-Company) wiki page.
 
 know issues <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/issues">are here</a>
 

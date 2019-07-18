@@ -1,4 +1,4 @@
-EESchema Schematic File Version 4
+EESchema Schematic File Version 5
 LIBS:audi_concert1_chorus1_volume_fix-cache
 EELAYER 29 0
 EELAYER END
@@ -895,9 +895,9 @@ F 3 "~" H 2450 3650 50  0001 C CNN
 $EndComp
 Wire Wire Line
 	2300 3950 2450 3950
-Text Label 3150 3950 2    50   ~ 0
+Text Label 2850 3950 2    50   ~ 0
 USB+
-Text Label 3150 4100 2    50   ~ 0
+Text Label 2850 4100 2    50   ~ 0
 USB-
 Wire Wire Line
 	11250 4450 11750 4450

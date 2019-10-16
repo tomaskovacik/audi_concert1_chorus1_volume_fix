@@ -242,11 +242,11 @@ void loop()
       {
         decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
         if (!dumpI2cDataAndDoNotFix) {
-          if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
+          if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1]== PANEL_REMOTE_VOLUME_UP)) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
             set_volume_up();
             set_volume();
           }
-          if (grab_volume == 1 && _data[1] == 0x88) { //some as previous but nob goes down
+          if (grab_volume == 1 &&  (_data[1] == PANEL_KNOB_DOWN || _data[1]== PANEL_REMOTE_VOLUME_DOWN)) { //some as previous but nob goes down
             set_volume_down();
             set_volume();
           }
@@ -330,7 +330,12 @@ void set_mute() {
     sendI2C(mute_data);
   }
 }
-/*
+/*#define PANEL_REMOTE_VOLUME_UP  0x1A
+#define PANEL_REMOTE_VOLUME_DOWN  0x1B
+#define PANEL_REMOTE_RIGHT 0x27
+#define PANEL_REMOTE_LEFT 0x26
+#define PANEL_REMOTE_UP 0x1C
+#define PANEL_REMOTE_DOWN 0x1D
    send unmute data over i2c
 */
 void set_unmute() {
@@ -1328,6 +1333,24 @@ void decode_button_push(uint8_t data) {
       break;
     case PANEL_BUTTON_RELEASE:
       Serial.println(F("button release"));
+      break;
+    case PANEL_REMOTE_VOLUME_UP:
+      Serial.println(F("Remote volume up"));
+      break;
+case PANEL_REMOTE_VOLUME_DOWN:
+      Serial.println(F("Remote volume down"));
+      break;
+case PANEL_REMOTE_RIGHT:
+      Serial.println(F("Remote right"));
+      break;
+case PANEL_REMOTE_LEFT:
+      Serial.println(F("Remote left"));
+      break;
+case PANEL_REMOTE_UP:
+      Serial.println(F("Remote up"));
+      break;
+case PANEL_REMOTE_DOWN:
+      Serial.println(F("Remote down"));
       break;
     default:
       Serial.print(F(" unknown")); Serial.println(data, HEX);

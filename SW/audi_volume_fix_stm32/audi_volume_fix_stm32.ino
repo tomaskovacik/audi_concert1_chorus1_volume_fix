@@ -264,11 +264,11 @@ void loop()
       if (_data[0] == 0x25)//button push
       {
         decode_button_push(_data[1]); //function which send to Serial port real function of pressed button in human language
-        if (grab_volume == 1 && _data[1] == 0x86) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is turn of knob is not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
+        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1]== PANEL_REMOTE_VOLUME_UP)) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is turn of knob is not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
           setVolumeUp();
           setVolume();
         }
-        if (grab_volume == 1 && _data[1] == 0x88) { //some as previous but nob goes down
+        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_DOWN || _data[1]== PANEL_REMOTE_VOLUME_DOWN)) { //some as previous but nob goes down
           setVolumeDown();
           setVolume();
         }
@@ -1247,6 +1247,10 @@ void decode_button_push(uint8_t data) {
       if (input == RADIO) muteVolume(13); //not sure
       if (serialDebug) Serial.println(F(" Seek > "));
       break;
+    case PANEL_REMOTE_RIGHT:
+      if (input == RADIO) muteVolume(13); //not sure
+      if (serialDebug) Serial.println(F(" Remote right "));
+      break;
     case PANEL_TP:
       //if (input==RADIO|CDCHANGER|TAPE) muteVolume(14);
       if (serialDebug) Serial.println(F(" TP"));
@@ -1303,6 +1307,10 @@ void decode_button_push(uint8_t data) {
       if (input == RADIO) muteVolume(18);
       if (serialDebug) Serial.println(F(" Seek < "));
       break;
+    case PANEL_REMOTE_LEFT:
+      if (input == RADIO) muteVolume(18);
+      if (serialDebug) Serial.println(F(" Remote left "));
+      break;
     case PANEL_REVERSE:
       if (input == TAPE) muteVolume(19); //not sure
       if (serialDebug) Serial.println(F(" REV"));
@@ -1322,6 +1330,20 @@ void decode_button_push(uint8_t data) {
       break;
     case PANEL_BUTTON_RELEASE:
       if (serialDebug) Serial.println(F("button release"));
+      break;
+    case PANEL_REMOTE_VOLUME_UP:
+      if (serialDebug) Serial.println(F(" Remote volume up "));
+      break;
+    case PANEL_REMOTE_VOLUME_DOWN:
+      if (serialDebug) Serial.println(F(" Remote volume down "));
+      break;
+    case PANEL_REMOTE_UP:
+      if (input == RADIO) muteVolume(18);
+      if (serialDebug) Serial.println(F(" Remote up "));
+      break;
+    case PANEL_REMOTE_DOWN:
+      if (input == RADIO) muteVolume(18);
+      if (serialDebug) Serial.println(F(" Remote down "));
       break;
     default:
       if (serialDebug) Serial.print(F(" unknown")); if (serialDebug) Serial.println(data, HEX);

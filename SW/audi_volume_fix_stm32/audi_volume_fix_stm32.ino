@@ -330,12 +330,7 @@ void set_mute() {
     sendI2C(mute_data);
   }
 }
-/*#define PANEL_REMOTE_VOLUME_UP  0x1A
-#define PANEL_REMOTE_VOLUME_DOWN  0x1B
-#define PANEL_REMOTE_RIGHT 0x27
-#define PANEL_REMOTE_LEFT 0x26
-#define PANEL_REMOTE_UP 0x1C
-#define PANEL_REMOTE_DOWN 0x1D
+/*
    send unmute data over i2c
 */
 void set_unmute() {

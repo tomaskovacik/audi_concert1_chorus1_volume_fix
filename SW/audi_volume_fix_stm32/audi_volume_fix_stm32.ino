@@ -684,6 +684,10 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
           case 0x0B:
             if (serialDebug) Serial.println(F("SAFE"));
             break;
+          //9A 61 14
+          case 0x14:
+            if (serialDebug) Serial.println(F("DIAG."));
+            break;
           case 0x17:
             if (serialDebug) Serial.println(F("??????????"));
             break;

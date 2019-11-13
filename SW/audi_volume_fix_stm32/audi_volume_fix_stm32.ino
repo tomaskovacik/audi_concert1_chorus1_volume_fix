@@ -687,6 +687,10 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
           case 0x17:
             if (serialDebug) Serial.println(F("??????????"));
             break;
+          //BOSE: 9A 61 1A
+          case 0x1A:
+            if (serialDebug) Serial.println("      BOSE      ");
+            break;
           default:
             dump = 1;
         }
@@ -1345,8 +1349,11 @@ void decode_button_push(uint8_t data) {
       if (input == RADIO) muteVolume(18);
       if (serialDebug) Serial.println(F(" Remote down "));
       break;
+    case PANEL_START:
+      if (serialDebug) Serial.println(F("Panel start"));
+      break;
     default:
-      if (serialDebug) Serial.print(F(" unknown")); if (serialDebug) Serial.println(data, HEX);
+      if (serialDebug) Serial.print(F("Unknown button pushed: ")); if (serialDebug) Serial.println(data, HEX);
       break;
   }
 }

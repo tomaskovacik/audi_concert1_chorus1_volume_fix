@@ -716,6 +716,10 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
           case 0x17:
             Serial.println(F("??????????"));
             break;
+          //BOSE: 9A 61 1A
+          case 0x1A:
+            Serial.println("      BOSE      ");
+            break;
           default:
             dump = 1;
         }
@@ -1347,8 +1351,11 @@ case PANEL_REMOTE_UP:
 case PANEL_REMOTE_DOWN:
       Serial.println(F("Remote down"));
       break;
+case PANEL_START:
+      Serial.println(F("Panel start"));
+      break;
     default:
-      Serial.print(F(" unknown")); Serial.println(data, HEX);
+      Serial.print(F("Unknown button pushed: ")); Serial.println(data, HEX);
       break;
   }
 }

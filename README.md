@@ -2,6 +2,7 @@ Software and hardware to fix volume problem on audi concert1/chorus1 units made 
 
 know issues <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/issues">are here</a>
 
+Module in action: <a href="https://youtu.be/YbFa_UYPMRQ</a>
 
 Schematics:
 

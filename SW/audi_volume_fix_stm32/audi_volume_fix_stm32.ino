@@ -203,21 +203,36 @@ void setup ()
   //        Serial.println(F("I2C init failed");
 }  // end of setup
 
+void printInfo(){
+      Serial.print(F("Firmware version: "));
+      Serial.println(F("1.0-30.12.19"));
+      Serial.println(F("(C) kovo, GPL3"));
+      Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
+      Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
+      Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
+}
 
 void loop()
 {
   if (Serial.available()) {
     char serial_char = Serial.read();
-    if (serial_char == 'v') {
-      Serial.print(F("Firmware version: "));
-      Serial.println(F("1.0-16.10.19"));
-      Serial.println(F("(C) kovo, GPL3"));
-      Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
-      Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
-      Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
+    switch (serial_char){
+      case 'D':
+      case 'd':
+      {
+        dumpI2cDataAndDoNotFix = !dumpI2cDataAndDoNotFix;
+        printInfo();
+      }
+      break;
+      case 'h':
+      case 'H':
+      case '?':
+      case 'v':
+      case 'V':
+      {
+        printInfo();
+      }
     }
-    if (serial_char == 'D')
-      dumpI2cDataAndDoNotFix = !dumpI2cDataAndDoNotFix;
   }
   if (digitalRead(displayRESET) && !displayRESETstate) {
     Serial.println("Reset HIGH");

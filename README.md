@@ -37,7 +37,7 @@ These use a different design and so are not compatible with this module. I never
 Known issues <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/issues">are here</a>
 
 #### Video
-Module in action: <a href="https://youtu.be/YbFa_UYPMRQ</a>
+Module in action: <a href="https://youtu.be/YbFa_UYPMRQ"></a>
 
 #### Schematics:
 

@@ -1,6 +1,5 @@
-EESchema Schematic File Version 5
-LIBS:audi_concert1_chorus1_volume_fix-cache
-EELAYER 29 0
+EESchema Schematic File Version 4
+EELAYER 30 0
 EELAYER END
 $Descr A3 16535 11693
 encoding utf-8
@@ -1203,4 +1202,25 @@ F 3 "" H 13250 950 50  0001 C CNN
 	1    13250 950 
 	1    0    0    -1  
 $EndComp
+Wire Wire Line
+	5750 7550 5150 7550
+Text Label 5150 7550 0    50   ~ 0
+GALA
+Text Label 12200 3250 2    50   ~ 0
+GALA
+$Comp
+L Device:R R1
+U 1 1 5E7EA43A
+P 11750 3250
+F 0 "R1" V 11543 3250 50  0000 C CNN
+F 1 "1k" V 11634 3250 50  0000 C CNN
+F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 11680 3250 50  0001 C CNN
+F 3 "~" H 11750 3250 50  0001 C CNN
+	1    11750 3250
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	11600 3250 11250 3250
+Wire Wire Line
+	11900 3250 12200 3250
 $EndSCHEMATC

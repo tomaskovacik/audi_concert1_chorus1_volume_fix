@@ -41,7 +41,7 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define displaySTATUS PA15 //STATUS/CS
 #define displayDATA PB4//DATA
 #define displayRESET PB5
-
+#define GALA PA0
 
 //this is SW i2c for arduino, did not work on STM32, cose there is some ASM woodoo :)))
 //#define DATA_IS_HIGH (PIND & (1<<PD4))
@@ -79,7 +79,7 @@ volatile uint8_t dwbp = 0; //display write byte pointer, for each dwdp there is 
 volatile uint8_t grabing_SPI = 0; //flag indicating we are busy grabing front panel display data, so we should not mess with them in main loop
 volatile uint8_t drdp = 0; //display read data pointer for front panel comunication
 
-volatile uint8_t start_volume = 0x82;
+volatile uint8_t start_volume = 0x4E;//was 0x82; //based on gala investigation start volume is 0x4E
 
 volatile uint8_t volume = start_volume; //set start volume here ...
 volatile uint8_t current_volume = start_volume; //set start volume here ..
@@ -94,6 +94,10 @@ volatile uint8_t grab_volume = 1;
 
 volatile uint8_t mute = 0;
 
+volatile uint8_t _gala = 3;
+
+volatile uint16_t captime; // timer count of low pulse (temp)
+volatile uint8_t _tmp_captime_show=0;
 
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
@@ -174,6 +178,7 @@ void set_unmute();
 
 void setup ()
 {
+
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;
   volume_packet[1] = 0x02;
@@ -195,12 +200,31 @@ void setup ()
   pinMode(displayDATA, INPUT_PULLUP);
   pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data send betwen display and main CPU
-
+  pinMode(GALA,INPUT_PULLUP);
   //serial for debug
   Serial.begin(115200);
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
   //        Serial.println(F("I2C init failed");
+
+  Timer2.pause(); // pause timer 2
+  //timer2 for GALA:
+  Timer2.setPrescaleFactor(72); // 1 microsecond resolution
+  // setup timer 2 channel 1 capture on rising edge
+  Timer2.setInputCaptureMode(TIMER_CH1, TIMER_IC_INPUT_DEFAULT); // use default input TI1
+  // setup timer 2 channel 2 capture on falling edge
+  Timer2.setInputCaptureMode(TIMER_CH2, TIMER_IC_INPUT_SWITCH); // use switched input TI1
+  Timer2.setPolarity(TIMER_CH2, 1); // trigger on falling edge
+  
+  // counter setup as slave triggered by TI1 in reset mode
+  Timer2.setSlaveFlags( TIMER_SMCR_TS_TI1FP1 | TIMER_SMCR_SMS_RESET );
+  Timer2.refresh();
+  Timer2.getCompare(TIMER_CH1); // clear capture flag
+  Timer2.getCompare(TIMER_CH2); // clear capture flag
+  Timer2.attachInterrupt(TIMER_CH2, TIMER2_ISR); //ch1 is rising edge, it's after low pulse, which we need to process while high pulse ocure...
+  Timer2.resume(); // let timer 2 run
+
+  
 }  // end of setup
 
 void printInfo(){
@@ -295,7 +319,7 @@ void loop()
           Serial.println(F("MUTE "));
           if ((_data[2] & B00000001)) {
             //2 8 81
-            //Serial.println(F("Muting")); dump_i2c_data(_data);
+            //Serial.printlnTimer2.setPolarity(TIMER_CH2, 1);(F("Muting")); dump_i2c_data(_data);
             if (!mute) { //we are not already muted
               mute = 1; //set mute flag
               saved_volume = current_volume;//save current volume
@@ -332,6 +356,22 @@ void loop()
       if (rdp == howmanypackets) rdp = 0;
     }
     //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
+  }
+  if (_tmp_captime_show){
+    _tmp_captime_show=0;
+    Serial.print("Speed=");
+    Serial.print((float)1000000/(2*captime));
+    Serial.println("km/h");
+    captime=0;
+  }
+}
+
+void TIMER2_ISR()
+{
+  if ( Timer2.getInputCaptureFlag(TIMER_CH2) && !_tmp_captime_show ) // period end
+  {
+    _tmp_captime_show=1;
+    captime = Timer2.getCompare(TIMER_CH2);//ICR1; // save a copy of current TMR1 count
   }
 }
 

@@ -13,8 +13,9 @@
 
 //#include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 #include <Wire.h>
-#include <HardwareTimer.h>
-HardwareTimer *Timer2 = new HardwareTimer(TIM2);
+//#include <HardwareTimer.h>
+HardwareTimer *Timer2;// = new HardwareTimer(TIM2);
+uint32_t channel;
 #include <SlowSoftWire.h> //so we do not have single lib for slave/master, so we have to init another one for master .... cose we do not have 3HW i2c .... tiktak ...
 #include "audi_concert_panel.h"
 
@@ -187,6 +188,14 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]);
 void set_mute();
 void set_unmute();
 
+void TIMER2_ISR(HardwareTimer*)
+{
+  //if ( Timer2 -> getCaptureFlag(TIMER_CH2) && !_tmp_captime_show ) // period end
+  //{
+    _tmp_captime_show=1;
+    captime = Timer2 -> getCaptureCompare(channel);//ICR1; // save a copy of current TMR1 count
+  //}
+}
 
 void setup ()
 {
@@ -214,23 +223,27 @@ void setup ()
   pinMode(GALA,INPUT_PULLUP);
   //serial for debug
   Serial.begin(115200);
+
+  TIM_TypeDef *Instance = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(GALA), PinMap_PWM);
+  channel = STM_PIN_CHANNEL(pinmap_function(digitalPinToPinName(GALA), PinMap_PWM));
+
+  Timer2 -> pause(); // pause timer 2
+  //timer2 for GALA:
+  Timer2 -> setPrescaleFactor(144); // 1 microsecond resolution
+  // setup timer 2 channel 1 capture on rising edge
+  Timer2 -> setMode(channel, TIMER_INPUT_CAPTURE_BOTHEDGE); // use default input TI1
+  // setup timer 2 channel 2 capture on falling edge
+  //Timer2 -> setInputCaptureMode(channel, TIMER_IC_INPUT_SWITCH); // use switched input TI1
+  //Timer2 -> setPolarity(TIMER_CH2, 1); // trigger on falling edge
   
-//  Timer2 -> pause(); // pause timer 2
-//  //timer2 for GALA:
-//  Timer2 -> setPrescaleFactor(144); // 1 microsecond resolution
-//  // setup timer 2 channel 1 capture on rising edge
-//  Timer2 -> setInputCaptureMode(TIMER_CH1, TIMER_IC_INPUT_DEFAULT); // use default input TI1
-//  // setup timer 2 channel 2 capture on falling edge
-//  Timer2 -> setInputCaptureMode(TIMER_CH2, TIMER_IC_INPUT_SWITCH); // use switched input TI1
-//  Timer2 -> setPolarity(TIMER_CH2, 1); // trigger on falling edge
-//  
-//  // counter setup as slave triggered by TI1 in reset mode
-//  Timer2 -> setSlaveFlags( TIMER_SMCR_TS_TI1FP1 | TIMER_SMCR_SMS_RESET );
-//  Timer2 -> refresh();
-//  Timer2 -> getCompare(TIMER_CH1); // clear capture flag
-//  Timer2 -> getCompare(TIMER_CH2); // clear capture flag
-//  Timer2 -> attachInterrupt(TIMER_CH2, TIMER2_ISR); //ch1 is rising edge, it's after low pulse, which we need to process while high pulse ocure...
-//  Timer2 -> resume(); // let timer 2 run
+  // counter setup as slave triggered by TI1 in reset mode
+  ///Timer2 -> setSlaveFlags( TIMER_SMCR_TS_TI1FP1 | TIMER_SMCR_SMS_RESET );
+  //Timer2 -> refresh();
+  //Timer2 -> getCompare(TIMER_CH1); // clear capture flag
+  //Timer2 -> getCompare(TIMER_CH2); // clear capture flag
+  //Timer2 -> setOverflow(0x10000);
+  Timer2 -> attachInterrupt(channel, TIMER2_ISR); //ch1 is rising edge, it's after low pulse, which we need to process while high pulse ocure...
+  Timer2 -> resume(); // let timer 2 run
 
 if (EEPROM[EEPROM_CR1] + EEPROM[EEPROM_CR2] != EEPROM[EEPROM_CR3]){
   Serial.println("seting default eeprom values");
@@ -255,6 +268,7 @@ void printInfo(){
 
 void loop()
 {
+  Serial.println(channel);
   if (Serial.available()) {
     char serial_char = Serial.read();
     switch (serial_char){
@@ -380,15 +394,6 @@ void loop()
     Serial.print((float)500000/(2*captime));
     Serial.println("km/h"); 
     captime=0;
-  }
-}
-
-void TIMER2_ISR()
-{
-  if ( Timer2 -> getCaptureFlag(TIMER_CH2) && !_tmp_captime_show ) // period end
-  {
-    _tmp_captime_show=1;
-    captime = Timer2 -> getCompare(TIMER_CH2);//ICR1; // save a copy of current TMR1 count
   }
 }
 

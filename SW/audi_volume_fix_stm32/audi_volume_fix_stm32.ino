@@ -691,6 +691,13 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       {
         grab_volume = 0;
         //54 41 20 20 20 35 20 20 0 0 0 0 0
+        //TEXT: VOL  1->...->5
+        //TEXT: SENS LO
+        //TEXT: RM   ON 
+        //TEXT: NAV  1->...->5 
+        //TEXT: TEL  L 
+        //TEXT: TA   1->...->5 
+        //TEXT: GALA OFF->1-...->5
         Serial.write(_data[2]);
         Serial.write(_data[3]);
         Serial.write(_data[4]);
@@ -699,7 +706,6 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
         Serial.write(_data[7]);
         Serial.write(_data[8]);
         Serial.write(_data[9]);
-
         Serial.println();
       }
       break;
@@ -837,7 +843,7 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
             {
               grab_volume = 1;
               //GALA
-              Serial.print("GALA ");
+              Serial.print("GALA "); //start radio with [2] pressed
 
               if ((_data[2] & 0x0F) == 1) Serial.println(F("OFF"));
               if ((_data[2] & 0x0F) == 0) Serial.println(F("ODB"));

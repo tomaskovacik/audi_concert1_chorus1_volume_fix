@@ -1,6 +1,15 @@
 // - GALAbranch
 //#include <Wire.h>
 
+#include <EEPROM.h>
+#define EEPROM_CR1 1 //12
+#define EEPROM_CR2 2 //34
+#define EEPROM_CR3 3 //56
+#define EEPROM_GALA 4
+#define EEPROM_VOL 5
+#define DEFAULT_START_GALA 3
+#define DEFAULT_START_VOL 3
+
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
 #include <SlowSoftWire.h> //so we do not have single lib for slave/master, so we have to init another one for master .... cose we do not have 3HW i2c .... tiktak ...
@@ -97,7 +106,7 @@ volatile uint8_t mute = 0;
 volatile uint8_t _gala = 3;
 
 volatile uint16_t captime; // timer count of low pulse (temp)
-volatile uint8_t _tmp_captime_show=0;
+volatile uint8_t _tmp_captime_show = 0;
 
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
@@ -175,10 +184,46 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]);
 void set_mute();
 void set_unmute();
 
+/*
+   #define EEPROM_CR1 1 //12
+   #define EEPROM_CR2 2 //34
+   #define EEPROM_CR3 3 //EEPROM_CR1+EEPROM_CR2  = 12+34=46
+   #define EEPROM_GALA 4
+   #define EEPROM_VOL 5
+   #define DEFAULT_START_GALA 3
+   #define DEFAULT_START_VOL 3
+*/
 
+uint8_t getGala() {
+  if (checkEEPROM())
+    return EEPROM.read(EEPROM_CR1)
+  }
+
+uint8_t checkEEPROM() {
+  if (EEPROM.read(EEPROM_CR1) != 12 || EEPROM.read(EEPROM_CR2) != 34 || EEPROM.read(EEPROM_CR3) != 56) {
+    //we will not return false only true but if eeprom is not set, we will fallback to defaults
+    Serial.println("seting default eeprom values");
+    EEPROM.write[EEPROM_GALA] = DEFAULT_START_GALA;
+    EEPROM.write[EEPROM_VOL] = DEFAULT_START_VOL;
+    EEPROM[EEPROM_CR1] = 12;
+    EEPROM[EEPROM_CR2] = 34;
+    EEPROM[EEPROM_CR3] = 56;
+  }
+  return true;
+}
+
+e
+
+
+
+}
+}
 void setup ()
 {
-
+  EEPROM.PageBase0 = 0x801F000;
+  EEPROM.PageBase1 = 0x801F800;
+  EEPROM.PageSize  = 0x400;
+  EEPROM.init();
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;
   volume_packet[1] = 0x02;
@@ -200,7 +245,7 @@ void setup ()
   pinMode(displayDATA, INPUT_PULLUP);
   pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data send betwen display and main CPU
-  pinMode(GALA,INPUT_PULLUP);
+  pinMode(GALA, INPUT_PULLUP);
   //serial for debug
   Serial.begin(115200);
   //arduino
@@ -215,7 +260,7 @@ void setup ()
   // setup timer 2 channel 2 capture on falling edge
   Timer2.setInputCaptureMode(TIMER_CH2, TIMER_IC_INPUT_SWITCH); // use switched input TI1
   Timer2.setPolarity(TIMER_CH2, 1); // trigger on falling edge
-  
+
   // counter setup as slave triggered by TI1 in reset mode
   Timer2.setSlaveFlags( TIMER_SMCR_TS_TI1FP1 | TIMER_SMCR_SMS_RESET );
   Timer2.refresh();
@@ -224,38 +269,39 @@ void setup ()
   Timer2.attachInterrupt(TIMER_CH2, TIMER2_ISR); //ch1 is rising edge, it's after low pulse, which we need to process while high pulse ocure...
   Timer2.resume(); // let timer 2 run
 
-  
+
+
 }  // end of setup
 
-void printInfo(){
-      Serial.print(F("Firmware version: "));
-      Serial.println(F("1.0-30.12.19"));
-      Serial.println(F("(C) kovo, GPL3"));
-      Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
-      Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
-      Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
+void printInfo() {
+  Serial.print(F("Firmware version: "));
+  Serial.println(F("1.0-30.12.19"));
+  Serial.println(F("(C) kovo, GPL3"));
+  Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
+  Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
+  Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
 }
 
 void loop()
 {
   if (Serial.available()) {
     char serial_char = Serial.read();
-    switch (serial_char){
+    switch (serial_char) {
       case 'D':
       case 'd':
-      {
-        dumpI2cDataAndDoNotFix = !dumpI2cDataAndDoNotFix;
-        printInfo();
-      }
-      break;
+        {
+          dumpI2cDataAndDoNotFix = !dumpI2cDataAndDoNotFix;
+          printInfo();
+        }
+        break;
       case 'h':
       case 'H':
       case '?':
       case 'v':
       case 'V':
-      {
-        printInfo();
-      }
+        {
+          printInfo();
+        }
     }
   }
   if (digitalRead(displayRESET) && !displayRESETstate) {
@@ -281,11 +327,11 @@ void loop()
       {
         decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
         if (!dumpI2cDataAndDoNotFix) {
-          if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1]== PANEL_REMOTE_VOLUME_UP)) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
+          if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
             set_volume_up();
             set_volume();
           }
-          if (grab_volume == 1 &&  (_data[1] == PANEL_KNOB_DOWN || _data[1]== PANEL_REMOTE_VOLUME_DOWN)) { //some as previous but nob goes down
+          if (grab_volume == 1 &&  (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) { //some as previous but nob goes down
             set_volume_down();
             set_volume();
           }
@@ -344,8 +390,8 @@ void loop()
           sendI2C(_data);
         }
       } else { //dumpI2cDataAndDoNotFix - we are gonna just dump data
-        Serial.print(millis()+String(" [")); dump_i2c_data(_data); Serial.print(F("] "));
-        sendI2C(_data); 
+        Serial.print(millis() + String(" [")); dump_i2c_data(_data); Serial.print(F("] "));
+        sendI2C(_data);
       }
 
 
@@ -357,12 +403,12 @@ void loop()
     }
     //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
   }
-  if (_tmp_captime_show){
-    _tmp_captime_show=0;
+  if (_tmp_captime_show) {
+    _tmp_captime_show = 0;
     Serial.print("Speed=");
-    Serial.print((float)1000000/(2*captime));
+    Serial.print((float)1000000 / (2 * captime));
     Serial.println("km/h");
-    captime=0;
+    captime = 0;
   }
 }
 
@@ -370,7 +416,7 @@ void TIMER2_ISR()
 {
   if ( Timer2.getInputCaptureFlag(TIMER_CH2) && !_tmp_captime_show ) // period end
   {
-    _tmp_captime_show=1;
+    _tmp_captime_show = 1;
     captime = Timer2.getCompare(TIMER_CH2);//ICR1; // save a copy of current TMR1 count
   }
 }
@@ -1395,22 +1441,22 @@ void decode_button_push(uint8_t data) {
     case PANEL_REMOTE_VOLUME_UP:
       Serial.println(F("Remote volume up"));
       break;
-case PANEL_REMOTE_VOLUME_DOWN:
+    case PANEL_REMOTE_VOLUME_DOWN:
       Serial.println(F("Remote volume down"));
       break;
-case PANEL_REMOTE_RIGHT:
+    case PANEL_REMOTE_RIGHT:
       Serial.println(F("Remote right"));
       break;
-case PANEL_REMOTE_LEFT:
+    case PANEL_REMOTE_LEFT:
       Serial.println(F("Remote left"));
       break;
-case PANEL_REMOTE_UP:
+    case PANEL_REMOTE_UP:
       Serial.println(F("Remote up"));
       break;
-case PANEL_REMOTE_DOWN:
+    case PANEL_REMOTE_DOWN:
       Serial.println(F("Remote down"));
       break;
-case PANEL_START:
+    case PANEL_START:
       Serial.println(F("Panel start"));
       break;
     default:

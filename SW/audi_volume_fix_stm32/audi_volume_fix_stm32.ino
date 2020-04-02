@@ -2,23 +2,16 @@
 //#include <Wire.h>
 
 #include <EEPROM.h>
-#define EEPROM_CR1 1 //12
-#define EEPROM_CR2 2 //34
-#define EEPROM_CR3 3 //56
-#define EEPROM_GALA 4
-#define EEPROM_VOL 5
-#define DEFAULT_START_GALA 3
-#define DEFAULT_START_VOL 3
 
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
 #include <SlowSoftWire.h> //so we do not have single lib for slave/master, so we have to init another one for master .... cose we do not have 3HW i2c .... tiktak ...
+
 #include "audi_concert_panel.h"
 
 SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 
 //TwoWire Swire = TwoWire(PB11, PB10);
-
 
 /*
     SPI comunication between motorola MC68HC05B32 cpu to front panel ST6280
@@ -51,6 +44,14 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define displayDATA PB4//DATA
 #define displayRESET PB5
 #define GALA PA0
+
+#define EEPROM_CR1 1 //12
+#define EEPROM_CR2 2 //34
+#define EEPROM_CR3 3 //56
+#define EEPROM_GALA 4
+#define EEPROM_VOL 5
+#define DEFAULT_START_GALA 3
+#define DEFAULT_START_VOL 3
 
 //this is SW i2c for arduino, did not work on STM32, cose there is some ASM woodoo :)))
 //#define DATA_IS_HIGH (PIND & (1<<PD4))

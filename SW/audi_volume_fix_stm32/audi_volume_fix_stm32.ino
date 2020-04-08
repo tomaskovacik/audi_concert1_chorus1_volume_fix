@@ -43,11 +43,19 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define displaySTATUS PA15 //STATUS/CS
 #define displayDATA PB4//DATA
 #define displayRESET PB5
-#define GALA PA0
 
-#define EEPROM_CR1 1 //12
-#define EEPROM_CR2 2 //34
-#define EEPROM_CR3 3 //56
+#define ENABLE_GALA_IN_VERSION_1
+
+//use PA14 for V1 board
+#define GALA PA14 //SWDCLK pin, exposed on version one boards
+//PA0 for V2
+//#define GALA PA0
+
+
+#define EEPROM_CR1 0x01 //12
+#define EEPROM_CR2 0x02 //34
+#define EEPROM_CR3 0x03 //CRC
+#define EEPROM_CRC (EEPROM.read(EEPROM_CR1)+EEPROM.read(EEPROM_VOL)+EEPROM.read(EEPROM_CR2)+EEPROM.read(EEPROM_VOL))
 #define EEPROM_GALA 4
 #define EEPROM_VOL 5
 #define DEFAULT_START_GALA 3
@@ -107,7 +115,6 @@ volatile uint8_t mute = 0;
 volatile uint8_t _gala = 3;
 
 volatile uint16_t captime; // timer count of low pulse (temp)
-volatile uint8_t _tmp_captime_show = 0;
 
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
@@ -197,28 +204,34 @@ void set_unmute();
 
 uint8_t getGala() {
   if (checkEEPROM())
-    return EEPROM.read(EEPROM_CR1)
-  }
+    return EEPROM.read(EEPROM_GALA);
+}
 
 uint8_t checkEEPROM() {
-  if (EEPROM.read(EEPROM_CR1) != 12 || EEPROM.read(EEPROM_CR2) != 34 || EEPROM.read(EEPROM_CR3) != 56) {
-    //we will not return false only true but if eeprom is not set, we will fallback to defaults
+  if (EEPROM.read(EEPROM_CR1) != 12 || EEPROM.read(EEPROM_CR2) != 34 || EEPROM.read(EEPROM_CR3) != EEPROM_CRC) {
+    //we will not return false only true but if eeprom is not set, we will fallback to defaults and save them!
     Serial.println("seting default eeprom values");
-    EEPROM.write[EEPROM_GALA] = DEFAULT_START_GALA;
-    EEPROM.write[EEPROM_VOL] = DEFAULT_START_VOL;
-    EEPROM[EEPROM_CR1] = 12;
-    EEPROM[EEPROM_CR2] = 34;
-    EEPROM[EEPROM_CR3] = 56;
+    EEPROM.write(EEPROM_GALA, DEFAULT_START_GALA);
+    EEPROM.write(EEPROM_VOL, DEFAULT_START_VOL);
+    EEPROM.write(EEPROM_CR1, 12);
+    EEPROM.write(EEPROM_CR2, 34);
+    EEPROM.write(EEPROM_CR3, EEPROM_CRC);
   }
   return true;
 }
 
-e
-
-
-
+void gala_up(void) {
+    Timer2.resume(); // let timer 2 run
+    //detachInterrupt(digitalPinToInterrupt(GALA));
+    attachInterrupt(digitalPinToInterrupt(GALA), gala_down, FALLING); //
 }
+
+void gala_down(void) {
+  Timer2.pause();
+  //detachInterrupt(digitalPinToInterrupt(GALA));
+  captime = Timer2.getCount();
 }
+
 void setup ()
 {
   EEPROM.PageBase0 = 0x801F000;
@@ -252,27 +265,13 @@ void setup ()
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
   //        Serial.println(F("I2C init failed");
-
-  Timer2.pause(); // pause timer 2
-  //timer2 for GALA:
+  
   Timer2.setPrescaleFactor(72); // 1 microsecond resolution
-  // setup timer 2 channel 1 capture on rising edge
-  Timer2.setInputCaptureMode(TIMER_CH1, TIMER_IC_INPUT_DEFAULT); // use default input TI1
-  // setup timer 2 channel 2 capture on falling edge
-  Timer2.setInputCaptureMode(TIMER_CH2, TIMER_IC_INPUT_SWITCH); // use switched input TI1
-  Timer2.setPolarity(TIMER_CH2, 1); // trigger on falling edge
-
-  // counter setup as slave triggered by TI1 in reset mode
-  Timer2.setSlaveFlags( TIMER_SMCR_TS_TI1FP1 | TIMER_SMCR_SMS_RESET );
   Timer2.refresh();
-  Timer2.getCompare(TIMER_CH1); // clear capture flag
-  Timer2.getCompare(TIMER_CH2); // clear capture flag
-  Timer2.attachInterrupt(TIMER_CH2, TIMER2_ISR); //ch1 is rising edge, it's after low pulse, which we need to process while high pulse ocure...
-  Timer2.resume(); // let timer 2 run
+  Timer2.setCount(0);
+  attachInterrupt(digitalPinToInterrupt(GALA), gala_up, RISING);
 
-
-
-}  // end of setup
+}
 
 void printInfo() {
   Serial.print(F("Firmware version: "));
@@ -404,21 +403,13 @@ void loop()
     }
     //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
   }
-  if (_tmp_captime_show) {
-    _tmp_captime_show = 0;
+  if (captime>0) {
     Serial.print("Speed=");
     Serial.print((float)1000000 / (2 * captime));
     Serial.println("km/h");
-    captime = 0;
-  }
-}
-
-void TIMER2_ISR()
-{
-  if ( Timer2.getInputCaptureFlag(TIMER_CH2) && !_tmp_captime_show ) // period end
-  {
-    _tmp_captime_show = 1;
-    captime = Timer2.getCompare(TIMER_CH2);//ICR1; // save a copy of current TMR1 count
+    Timer2.setCount(0);
+    captime=0;
+    attachInterrupt(digitalPinToInterrupt(GALA), gala_up, RISING); //
   }
 }
 

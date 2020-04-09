@@ -197,6 +197,21 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]);
 void set_mute();
 void set_unmute();
 
+uint8_t setStartVolumeFromEeprom(void) {
+  switch (getVolEeprom()) {
+    case 1:
+      return 0x56; //should check it on real radio, I take this from volume map for (set_volume_up()) 
+    case 2:
+      return 0x52;
+    case 3:
+      return 0x4E;
+    case 4:
+      return 0x4A;
+    case 5:
+      return 0x46;
+  }
+}
+
 uint8_t getGalaStartSpeed(void) {
   /*
      GALA = 1 -> 100-(1-1)*15 = 100 -  0 = 100
@@ -274,6 +289,10 @@ void galaFalling(void) {
 
 void setup ()
 {
+  start_volume = setStartVolumeFromEeprom();
+  volume = start_volume; //set start volume here ...
+  current_volume = start_volume; //set start volume here ..
+  saved_volume = start_volume;
   EEPROM.PageBase0 = 0x801F000;
   EEPROM.PageBase1 = 0x801F800;
   EEPROM.PageSize  = 0x400;

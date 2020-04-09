@@ -124,6 +124,8 @@ uint8_t loudness_packet[howmanybytesinpacket];
 
 uint8_t displayRESETstate = 0;
 uint8_t dumpI2cDataAndDoNotFix = 0;
+
+float previous_speed, current_speed;
 /*
    functions
 */
@@ -195,16 +197,16 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]);
 void set_mute();
 void set_unmute();
 
-/*
-   #define EEPROM_CR1 1 //12
-   #define EEPROM_CR2 2 //34
-   #define EEPROM_CR3 3 //EEPROM_CR1+EEPROM_CR2  = 12+34=46
-   #define EEPROM_GALA 4
-   #define EEPROM_VOL 5
-   #define DEFAULT_START_GALA 3
-   #define DEFAULT_START_VOL 3
-*/
-
+uint8_t getGalaStartSpeed(void) {
+  /*
+     GALA = 1 -> 100-(1-1)*15 = 100 -  0 = 100
+     GALA = 2 -> 100-(2-1)*15 = 100 - 15 =  85
+     GALA = 3 -> 100-(3-1)*15 = 100 - 30 =  70
+     GALA = 4 -> 100-(4-1)*15 = 100 - 45 =  55
+     GALA = 5 -> 100-(5-1)*15 = 100 - 60 =  40
+  */
+  return (100 - (getGalaEeprom() - 1) * 15);
+}
 
 uint8_t getGalaEeprom(void) {
   if (checkEEPROM())
@@ -449,13 +451,126 @@ void loop()
     }
     //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
   }
-  if (captime > 0) {
+  if (getGalaEeprom() && captime > 0) {//gala or captime is not 0
     //Serial.print("Speed=");
     //Serial.print((float)1000000 / (2 * captime));
     //Serial.println("km/h");
+    previous_speed = current_speed;
+    current_speed = 1000000 / (2 * captime);
     Timer2.setCount(0);
     captime = 0;
     attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING); //
+    //goig up
+    if (previous_speed < getGalaStartSpeed() < current_speed) {
+      set_volume_up();
+      send_volume();
+    }
+    //+30
+    if (previous_speed < getGalaStartSpeed() + 30 < current_speed) {
+      loudness--;
+      send_loudness();
+    }
+    //+60
+    if (previous_speed < getGalaStartSpeed() + 60 < current_speed) {
+      set_volume_up();
+      send_volume();
+    }
+    //+90
+    if (previous_speed < getGalaStartSpeed() + 90 < current_speed) {
+      loudness--;
+      send_loudness();
+    }
+    //+120
+    if (previous_speed < getGalaStartSpeed() + 120 < current_speed) {
+      set_volume_up();
+      send_volume();
+    }
+    //+150
+    if (previous_speed < getGalaStartSpeed() + 150 < current_speed) {
+      loudness--;
+      send_loudness();
+    }
+    //+180
+    if (previous_speed < getGalaStartSpeed() + 180 < current_speed) {
+      set_volume_up();
+      send_volume();
+    }
+    //+210
+    if (previous_speed < getGalaStartSpeed() + 210 < current_speed) {
+      loudness--;
+      send_loudness();
+    }
+    //+240
+    if (previous_speed < getGalaStartSpeed() + 240 < current_speed) {
+      set_volume_up();
+      send_volume();
+    }
+    //+270
+    if (previous_speed < getGalaStartSpeed() + 270 < current_speed) {
+      loudness--;
+      send_loudness();
+    }
+    //+300 //355 max :D :D :D
+    if (previous_speed < getGalaStartSpeed() + 300 < current_speed) {
+      set_volume_up();
+      send_volume();
+    }
+    //slowing down
+    //+300
+    if (current_speed < getGalaStartSpeed() + 300 < previous_speed) {
+      set_volume_down();
+      send_volume();
+    }
+    //+270
+    if (current_speed < getGalaStartSpeed() + 270 < previous_speed) {
+      loudness++;
+      send_loudness();
+    }
+    //+240
+    if (current_speed < getGalaStartSpeed() + 240 < previous_speed) {
+      set_volume_down();
+      send_volume();
+    }
+    //+210
+    if (current_speed < getGalaStartSpeed() + 210 < previous_speed) {
+      loudness++;
+      send_loudness();
+    }
+    //+180
+    if (current_speed < getGalaStartSpeed() + 180 < previous_speed) {
+      set_volume_down();
+      send_volume();
+    }
+    //+150
+    if (current_speed < getGalaStartSpeed() + 150 < previous_speed) {
+      loudness++;
+      send_loudness();
+    }
+    //+120
+    if (current_speed < getGalaStartSpeed() + 120 < previous_speed) {
+      set_volume_down();
+      send_volume();
+    }
+    //+90
+    if (current_speed < getGalaStartSpeed() + 90 < previous_speed) {
+      loudness++;
+      send_loudness();
+    }
+    //+60
+    if (current_speed < getGalaStartSpeed() + 60 < previous_speed) {
+      set_volume_down();
+      send_volume();
+    }
+    //+30
+    if (current_speed < getGalaStartSpeed() + 30 < previous_speed) {
+      loudness++;
+      send_loudness();
+    }
+    //+0
+    if (current_speed < getGalaStartSpeed()  < previous_speed) {
+      set_volume_down();
+      send_volume();
+    }
   }
 }
 

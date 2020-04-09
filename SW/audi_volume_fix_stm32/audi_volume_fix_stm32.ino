@@ -54,12 +54,15 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 
 #define EEPROM_CR1 0x01 //12
 #define EEPROM_CR2 0x02 //34
-#define EEPROM_CR3 0x03 //CRC
-#define EEPROM_CRC (EEPROM.read(EEPROM_CR1)+EEPROM.read(EEPROM_VOL)+EEPROM.read(EEPROM_CR2)+EEPROM.read(EEPROM_VOL))
-#define EEPROM_GALA 4
-#define EEPROM_VOL 5
+#define EEPROM_CR3 0x03 //56
+#define EEPROM_CR4 0x04 //CRC
+#define EEPROM_GALA 0x05
+#define EEPROM_VOL 0x06
+#define EEPROM_TA 0x07
+#define EEPROM_CRC (EEPROM.read(EEPROM_CR1)+EEPROM.read(EEPROM_VOL)+EEPROM.read(EEPROM_CR2)+EEPROM.read(EEPROM_VOL)+EEPROM.read(EEPROM_CR3)+EEPROM.read(EEPROM_TA))
 #define DEFAULT_START_GALA 3
 #define DEFAULT_START_VOL 3
+#define DEFAULT_START_TA 3
 
 //this is SW i2c for arduino, did not work on STM32, cose there is some ASM woodoo :)))
 //#define DATA_IS_HIGH (PIND & (1<<PD4))
@@ -202,31 +205,66 @@ void set_unmute();
    #define DEFAULT_START_VOL 3
 */
 
-uint8_t getGala() {
+
+uint8_t getGalaEeprom(void) {
   if (checkEEPROM())
-    return EEPROM.read(EEPROM_GALA);
+    return (uint8_t) EEPROM.read(EEPROM_GALA);
+}
+
+uint8_t getVolEeprom(void) {
+  if (checkEEPROM())
+    return (uint8_t)EEPROM.read(EEPROM_VOL);
+}
+
+uint8_t getTaEeprom(void) {
+  if (checkEEPROM())
+    return (uint8_t)EEPROM.read(EEPROM_TA);
+}
+
+uint8_t saveGalaEeprom(uint16_t gala) {
+  checkEEPROM(); //set defaults if no eeprom is set
+  if (gala < 0 || gala > 5) return false;
+  EEPROM.write(EEPROM_GALA, gala);
+  return EEPROM.write(EEPROM_CR4, EEPROM_CRC);
+}
+
+uint8_t saveVolEeprom(uint16_t vol) {
+  checkEEPROM();
+  if (vol < 1 || vol > 5) return false;
+  EEPROM.write(EEPROM_VOL, vol);
+  return EEPROM.write(EEPROM_CR4, EEPROM_CRC);
+}
+
+uint8_t saveTaEeprom(uint16_t ta) {
+  checkEEPROM();
+  if (ta < 1 || ta > 5) return false;
+  EEPROM.write(EEPROM_TA, ta);
+  return EEPROM.write(EEPROM_CR4, EEPROM_CRC);
 }
 
 uint8_t checkEEPROM() {
-  if (EEPROM.read(EEPROM_CR1) != 12 || EEPROM.read(EEPROM_CR2) != 34 || EEPROM.read(EEPROM_CR3) != EEPROM_CRC) {
+  if (EEPROM.read(EEPROM_CR1) != 12 || EEPROM.read(EEPROM_CR2) != 34 || EEPROM.read(EEPROM_CR3) != 56 || EEPROM.read(EEPROM_CR4) != EEPROM_CRC) {
     //we will not return false only true but if eeprom is not set, we will fallback to defaults and save them!
-    Serial.println("seting default eeprom values");
+    //Serial.println("seting default eeprom values");
     EEPROM.write(EEPROM_GALA, DEFAULT_START_GALA);
     EEPROM.write(EEPROM_VOL, DEFAULT_START_VOL);
+    EEPROM.write(EEPROM_TA, DEFAULT_START_TA);
     EEPROM.write(EEPROM_CR1, 12);
     EEPROM.write(EEPROM_CR2, 34);
-    EEPROM.write(EEPROM_CR3, EEPROM_CRC);
+    EEPROM.write(EEPROM_CR3, 56);
+    EEPROM.write(EEPROM_CR4, EEPROM_CRC);
   }
   return true;
 }
 
-void gala_up(void) {
-    Timer2.resume(); // let timer 2 run
-    //detachInterrupt(digitalPinToInterrupt(GALA));
-    attachInterrupt(digitalPinToInterrupt(GALA), gala_down, FALLING); //
+
+void galaRising(void) {
+  Timer2.resume(); // let timer 2 run
+  //detachInterrupt(digitalPinToInterrupt(GALA));
+  attachInterrupt(digitalPinToInterrupt(GALA), galaFalling, FALLING); //
 }
 
-void gala_down(void) {
+void galaFalling(void) {
   Timer2.pause();
   //detachInterrupt(digitalPinToInterrupt(GALA));
   captime = Timer2.getCount();
@@ -265,11 +303,11 @@ void setup ()
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
   //        Serial.println(F("I2C init failed");
-  
+
   Timer2.setPrescaleFactor(72); // 1 microsecond resolution
   Timer2.refresh();
   Timer2.setCount(0);
-  attachInterrupt(digitalPinToInterrupt(GALA), gala_up, RISING);
+  attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING);
 
 }
 
@@ -403,13 +441,13 @@ void loop()
     }
     //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
   }
-  if (captime>0) {
+  if (captime > 0) {
     Serial.print("Speed=");
     Serial.print((float)1000000 / (2 * captime));
     Serial.println("km/h");
     Timer2.setCount(0);
-    captime=0;
-    attachInterrupt(digitalPinToInterrupt(GALA), gala_up, RISING); //
+    captime = 0;
+    attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING); //
   }
 }
 
@@ -779,6 +817,17 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
         Serial.write(_data[9]);
 
         Serial.println();
+        if (_data[2] == 'V' && _data[3] == 'O' && _data[4] == 'L' && _data[5] == ' ' && _data[6] == ' ' && _data[8] == ' ' && _data[9] == ' ') //"VOL  X  "
+          saveVolEeprom((uint8_t)_data[7] - 32);
+        if (_data[2] == 'T' && _data[3] == 'A' && _data[4] == ' ' && _data[5] == ' ' && _data[6] == ' ' && _data[8] == ' ' && _data[9] == ' ') //"TA     "
+          saveTaEeprom((uint8_t)_data[7]);
+        if (_data[2] == 'G' && _data[3] == 'A' && _data[4] == 'L' && _data[5] == 'A' && _data[6] == ' ') { //"GALA X  "
+          if (_data[8] == ' ' && _data[9] == ' ') //GALA  1->5
+            saveVolEeprom((uint8_t)_data[7]);
+          if (_data[8] == 'O' && _data[9] == 'F' && _data[9] == 'F') //GALA OFF
+            saveVolEeprom(0);
+        }
+
       }
       break;
     case 0x61:

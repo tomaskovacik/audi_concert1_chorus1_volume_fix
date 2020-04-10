@@ -343,10 +343,6 @@ void printInfo() {
   Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
   Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
   Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
-  printConfig();
-}
-
-void printConfig(void){
   Serial.print(F("Default GALA: ")); Serial.println(getGalaEeprom());
   Serial.print(F("Default VOLUME: ")); Serial.println(getVolEeprom());
   Serial.print(F("Default TA volume: ")); Serial.println(getTaEeprom());
@@ -373,30 +369,6 @@ void loop()
           printInfo();
         }
       break;
-      case 'G':
-        saveGalaEeprom(getGalaEeprom() + 1);
-        printConfig();
-        break;
-      case 'g':
-        saveGalaEeprom(getGalaEeprom() - 1);
-        printConfig();
-        break;
-      case 'W':
-        saveVolEeprom(getVolEeprom() + 1);
-        printConfig();
-        break;
-      case 'w':
-        saveVolEeprom(getVolEeprom() - 1);
-        printConfig();
-        break;
-      case 'T':
-        saveTaEeprom(getTaEeprom() + 1);
-        printConfig();
-        break;
-      case 't':
-        saveTaEeprom(getTaEeprom() - 1);
-        printConfig();
-        break;
     }
   }
   if (digitalRead(displayRESET) && !displayRESETstate) {
@@ -509,139 +481,115 @@ void loop()
   if (getGalaEeprom() && captime > 0) {//gala or captime is not 0
     current_speed = 1000000 / (2 * captime);
     if (previous_speed != current_speed) {
-      //Serial.println(previous_speed);
-      //Serial.println(current_speed);
       //goig up
       uint16_t galaStartSpeed = getGalaStartSpeed();
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U0 ");Serial.println(galaStartSpeed);
         set_volume_up();
         send_volume();
       }
       galaStartSpeed += 30; //+30
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U30 ");Serial.println(galaStartSpeed);
         loudness--;
         send_loudness();
       }
       galaStartSpeed += 30; //+60
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U60 ");Serial.println(galaStartSpeed);
         set_volume_up();
         send_volume();
       }
       galaStartSpeed += 30; //+90
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U90 ");Serial.println(galaStartSpeed);
         loudness--;
         send_loudness();
       }
       galaStartSpeed += 30; //+120
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U120 ");Serial.println(galaStartSpeed);
         set_volume_up();
         send_volume();
       }
       galaStartSpeed += 30; //+150
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U15- ");Serial.println(galaStartSpeed);
         loudness--;
         send_loudness();
       }
       galaStartSpeed += 30; //+180
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U180 ");Serial.println(galaStartSpeed);
         set_volume_up();
         send_volume();
       }
       galaStartSpeed += 30; //+210
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U210 ");Serial.println(galaStartSpeed);
         loudness--;
         send_loudness();
       }
       galaStartSpeed += 30; //+240
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U240 ");Serial.println(galaStartSpeed);
         set_volume_up();
         send_volume();
       }
       galaStartSpeed += 30; //+270
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U270 ");Serial.println(galaStartSpeed);
         loudness--;
         send_loudness();
       }
       galaStartSpeed += 30; //+300 //355 max :D :D :D
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        //Serial.print("U300 ");Serial.println(galaStartSpeed);
         set_volume_up();
         send_volume();
       }
       //slowing down
       //+300
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D300 ");Serial.println(galaStartSpeed);
         set_volume_down();
         send_volume();
       }
       galaStartSpeed -= 30; //+270
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D270 ");Serial.println(galaStartSpeed);
         loudness++;
         send_loudness();
       }
       galaStartSpeed -= 30; //+240
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D240 ");Serial.println(galaStartSpeed);
         set_volume_down();
         send_volume();
       }
       galaStartSpeed -= 30; //+210
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D210 ");Serial.println(galaStartSpeed);
         loudness++;
         send_loudness();
       }
       galaStartSpeed -= 30; //+180
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D180 ");Serial.println(galaStartSpeed);
         set_volume_down();
         send_volume();
       }
       galaStartSpeed -= 30; //+150
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D150 ");Serial.println(galaStartSpeed);
         loudness++;
         send_loudness();
       }
       galaStartSpeed -= 30; //+120
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D120 ");Serial.println(galaStartSpeed);
         set_volume_down();
         send_volume();
       }
       galaStartSpeed -= 30; //+90
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D90 ");Serial.println(galaStartSpeed);
         loudness++;
         send_loudness();
       }
       galaStartSpeed -= 30; //+60
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D60 ");Serial.println(galaStartSpeed);
         set_volume_down();
         send_volume();
       }
       galaStartSpeed -= 30; //+30
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D30 ");Serial.println(galaStartSpeed);
         loudness++;
         send_loudness();
       }
       galaStartSpeed -= 30; //+0
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        //Serial.print("D0 ");Serial.println(galaStartSpeed);
         set_volume_down();
         send_volume();
       }

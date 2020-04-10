@@ -2,6 +2,11 @@
 //#include <Wire.h>
 
 #include <EEPROM.h>
+#define FLASH_SIZE 64
+#define EEPROM_PAGE_SIZE        (uint16)0x400  /* Page size = 1KByte */
+//set this absed on your chip, but mostly 64 will do, this FW is 40k big for now ...
+#define EEPROM_PAGE0_BASE    ((uint32)(0x8000000 + FLASH_SIZE * 1024 - 2 * EEPROM_PAGE_SIZE))
+#define EEPROM_PAGE1_BASE               ((uint32)(EEPROM_PAGE0_BASE + EEPROM_PAGE_SIZE))
 
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
@@ -125,7 +130,7 @@ uint8_t loudness_packet[howmanybytesinpacket];
 uint8_t displayRESETstate = 0;
 uint8_t dumpI2cDataAndDoNotFix = 0;
 
-float previous_speed, current_speed;
+uint16_t previous_speed, current_speed;
 /*
    functions
 */
@@ -200,7 +205,7 @@ void set_unmute();
 uint8_t setStartVolumeFromEeprom(void) {
   switch (getVolEeprom()) {
     case 1:
-      return 0x56; //should check it on real radio, I take this from volume map for (set_volume_up()) 
+      return 0x56; //should check it on real radio, I take this from volume map for (set_volume_up())
     case 2:
       return 0x52;
     case 3:
@@ -212,7 +217,7 @@ uint8_t setStartVolumeFromEeprom(void) {
   }
 }
 
-uint8_t getGalaStartSpeed(void) {
+uint16_t getGalaStartSpeed(void) {
   /*
      GALA = 1 -> 100-(1-1)*15 = 100 -  0 = 100
      GALA = 2 -> 100-(2-1)*15 = 100 - 15 =  85
@@ -220,7 +225,7 @@ uint8_t getGalaStartSpeed(void) {
      GALA = 4 -> 100-(4-1)*15 = 100 - 45 =  55
      GALA = 5 -> 100-(5-1)*15 = 100 - 60 =  40
   */
-  return (100 - (getGalaEeprom() - 1) * 15);
+  return (100 - ((getGalaEeprom() - 1) * 15));
 }
 
 uint8_t getGalaEeprom(void) {
@@ -260,18 +265,18 @@ uint8_t saveTaEeprom(uint16_t ta) {
 }
 
 uint8_t checkEEPROM() {
-  if (EEPROM.read(EEPROM_CR1) != 12 || EEPROM.read(EEPROM_CR2) != 34 || EEPROM.read(EEPROM_CR3) != 56 || EEPROM.read(EEPROM_CR4) != EEPROM_CRC) {
-    //we will not return false only true but if eeprom is not set, we will fallback to defaults and save them!
-    //Serial.println("seting default eeprom values");
-    EEPROM.write(EEPROM_GALA, DEFAULT_START_GALA);
-    EEPROM.write(EEPROM_VOL, DEFAULT_START_VOL);
-    EEPROM.write(EEPROM_TA, DEFAULT_START_TA);
-    EEPROM.write(EEPROM_CR1, 12);
-    EEPROM.write(EEPROM_CR2, 34);
-    EEPROM.write(EEPROM_CR3, 56);
-    EEPROM.write(EEPROM_CR4, EEPROM_CRC);
-  }
-  return true;
+  if (EEPROM.read(EEPROM_CR1) == 12 && EEPROM.read(EEPROM_CR2) == 34 && EEPROM.read(EEPROM_CR3) == 56 && EEPROM.read(EEPROM_CR4) == EEPROM_CRC)
+    return true;
+  EEPROM.write(EEPROM_GALA, DEFAULT_START_GALA);
+  EEPROM.write(EEPROM_VOL, DEFAULT_START_VOL);
+  EEPROM.write(EEPROM_TA, DEFAULT_START_TA);
+  EEPROM.write(EEPROM_CR1, 12);
+  EEPROM.write(EEPROM_CR2, 34);
+  EEPROM.write(EEPROM_CR3, 56);
+  EEPROM.write(EEPROM_CR4, EEPROM_CRC);
+  if (EEPROM.read(EEPROM_CR1) == 12 && EEPROM.read(EEPROM_CR2) == 34 && EEPROM.read(EEPROM_CR3) == 56 && EEPROM.read(EEPROM_CR4) == EEPROM_CRC)
+    return true;
+  return false;
 }
 
 
@@ -289,14 +294,13 @@ void galaFalling(void) {
 
 void setup ()
 {
+  EEPROM.init(EEPROM_PAGE0_BASE, EEPROM_PAGE1_BASE, EEPROM_PAGE_SIZE);
+  delay(1000);
+  checkEEPROM();
   start_volume = setStartVolumeFromEeprom();
   volume = start_volume; //set start volume here ...
   current_volume = start_volume; //set start volume here ..
   saved_volume = start_volume;
-  EEPROM.PageBase0 = 0x801F000;
-  EEPROM.PageBase1 = 0x801F800;
-  EEPROM.PageSize  = 0x400;
-  EEPROM.init();
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;
   volume_packet[1] = 0x02;
@@ -339,6 +343,9 @@ void printInfo() {
   Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
   Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
   Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
+  Serial.print(F("Default GALA: ")); Serial.println(getGalaEeprom());
+  Serial.print(F("Default VOLUME: ")); Serial.println(getVolEeprom());
+  Serial.print(F("Default TA volume: ")); Serial.println(getTaEeprom());
 }
 
 void loop()
@@ -471,125 +478,125 @@ void loop()
     //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
   }
   if (getGalaEeprom() && captime > 0) {//gala or captime is not 0
-    //Serial.print("Speed=");
-    //Serial.print((float)1000000 / (2 * captime));
-    //Serial.println("km/h");
-    previous_speed = current_speed;
     current_speed = 1000000 / (2 * captime);
+    if (previous_speed != current_speed) {
+      //goig up
+      uint16_t galaStartSpeed = getGalaStartSpeed();
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      galaStartSpeed += 30; //+30
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        loudness--;
+        send_loudness();
+      }
+      galaStartSpeed += 30; //+60
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      galaStartSpeed += 30; //+90
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        loudness--;
+        send_loudness();
+      }
+      galaStartSpeed += 30; //+120
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      galaStartSpeed += 30; //+150
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        loudness--;
+        send_loudness();
+      }
+      galaStartSpeed += 30; //+180
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      galaStartSpeed += 30; //+210
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        loudness--;
+        send_loudness();
+      }
+      galaStartSpeed += 30; //+240
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      galaStartSpeed += 30; //+270
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        loudness--;
+        send_loudness();
+      }
+      galaStartSpeed += 30; //+300 //355 max :D :D :D
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      //slowing down
+      //+300
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+      galaStartSpeed -= 30; //+270
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        loudness++;
+        send_loudness();
+      }
+      galaStartSpeed -= 30; //+240
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+      galaStartSpeed -= 30; //+210
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        loudness++;
+        send_loudness();
+      }
+      galaStartSpeed -= 30; //+180
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+      galaStartSpeed -= 30; //+150
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        loudness++;
+        send_loudness();
+      }
+      galaStartSpeed -= 30; //+120
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+      galaStartSpeed -= 30; //+90
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        loudness++;
+        send_loudness();
+      }
+      galaStartSpeed -= 30; //+60
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+      galaStartSpeed -= 30; //+30
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        loudness++;
+        send_loudness();
+      }
+      galaStartSpeed -= 30; //+0
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+    }
+    previous_speed = current_speed;
     Timer2.setCount(0);
     captime = 0;
     attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING); //
-    //goig up
-    if (previous_speed < getGalaStartSpeed() < current_speed) {
-      set_volume_up();
-      send_volume();
-    }
-    //+30
-    if (previous_speed < getGalaStartSpeed() + 30 < current_speed) {
-      loudness--;
-      send_loudness();
-    }
-    //+60
-    if (previous_speed < getGalaStartSpeed() + 60 < current_speed) {
-      set_volume_up();
-      send_volume();
-    }
-    //+90
-    if (previous_speed < getGalaStartSpeed() + 90 < current_speed) {
-      loudness--;
-      send_loudness();
-    }
-    //+120
-    if (previous_speed < getGalaStartSpeed() + 120 < current_speed) {
-      set_volume_up();
-      send_volume();
-    }
-    //+150
-    if (previous_speed < getGalaStartSpeed() + 150 < current_speed) {
-      loudness--;
-      send_loudness();
-    }
-    //+180
-    if (previous_speed < getGalaStartSpeed() + 180 < current_speed) {
-      set_volume_up();
-      send_volume();
-    }
-    //+210
-    if (previous_speed < getGalaStartSpeed() + 210 < current_speed) {
-      loudness--;
-      send_loudness();
-    }
-    //+240
-    if (previous_speed < getGalaStartSpeed() + 240 < current_speed) {
-      set_volume_up();
-      send_volume();
-    }
-    //+270
-    if (previous_speed < getGalaStartSpeed() + 270 < current_speed) {
-      loudness--;
-      send_loudness();
-    }
-    //+300 //355 max :D :D :D
-    if (previous_speed < getGalaStartSpeed() + 300 < current_speed) {
-      set_volume_up();
-      send_volume();
-    }
-    //slowing down
-    //+300
-    if (current_speed < getGalaStartSpeed() + 300 < previous_speed) {
-      set_volume_down();
-      send_volume();
-    }
-    //+270
-    if (current_speed < getGalaStartSpeed() + 270 < previous_speed) {
-      loudness++;
-      send_loudness();
-    }
-    //+240
-    if (current_speed < getGalaStartSpeed() + 240 < previous_speed) {
-      set_volume_down();
-      send_volume();
-    }
-    //+210
-    if (current_speed < getGalaStartSpeed() + 210 < previous_speed) {
-      loudness++;
-      send_loudness();
-    }
-    //+180
-    if (current_speed < getGalaStartSpeed() + 180 < previous_speed) {
-      set_volume_down();
-      send_volume();
-    }
-    //+150
-    if (current_speed < getGalaStartSpeed() + 150 < previous_speed) {
-      loudness++;
-      send_loudness();
-    }
-    //+120
-    if (current_speed < getGalaStartSpeed() + 120 < previous_speed) {
-      set_volume_down();
-      send_volume();
-    }
-    //+90
-    if (current_speed < getGalaStartSpeed() + 90 < previous_speed) {
-      loudness++;
-      send_loudness();
-    }
-    //+60
-    if (current_speed < getGalaStartSpeed() + 60 < previous_speed) {
-      set_volume_down();
-      send_volume();
-    }
-    //+30
-    if (current_speed < getGalaStartSpeed() + 30 < previous_speed) {
-      loudness++;
-      send_loudness();
-    }
-    //+0
-    if (current_speed < getGalaStartSpeed()  < previous_speed) {
-      set_volume_down();
-      send_volume();
-    }
   }
 }
 

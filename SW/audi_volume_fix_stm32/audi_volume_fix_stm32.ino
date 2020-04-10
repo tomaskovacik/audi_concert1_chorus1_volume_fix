@@ -232,6 +232,7 @@ void loop()
       {
         printInfo();
       }
+      break;
     }
   }
   if (digitalRead(displayRESET) && !displayRESETstate) {

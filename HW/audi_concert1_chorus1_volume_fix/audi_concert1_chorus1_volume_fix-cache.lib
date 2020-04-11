@@ -7,7 +7,7 @@ DEF Device_CP C 0 10 N Y 1 F N
 F0 "C" 25 100 50 H V L CNN
 F1 "Device_CP" 25 -100 50 H V L CNN
 F2 "" 38 -150 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
+F3 "~" 0 0 50 H I C CNN
 $FPLIST
  CP_*
 $ENDFPLIST
@@ -30,7 +30,7 @@ DEF Device_Crystal Y 0 40 N N 1 F N
 F0 "Y" 0 150 50 H V C CNN
 F1 "Device_Crystal" 0 -150 50 H V C CNN
 F2 "" 0 0 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
+F3 "~" 0 0 50 H I C CNN
 $FPLIST
  Crystal*
 $ENDFPLIST
@@ -51,7 +51,7 @@ DEF Device_Crystal_GND24 Y 0 40 Y N 1 F N
 F0 "Y" 125 200 50 H V L CNN
 F1 "Device_Crystal_GND24" 125 125 50 H V L CNN
 F2 "" 0 0 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
+F3 "~" 0 0 50 H I C CNN
 $FPLIST
  Crystal*
 $ENDFPLIST
@@ -78,7 +78,7 @@ DEF Device_LED D 0 40 N N 1 F N
 F0 "D" 0 100 50 H V C CNN
 F1 "Device_LED" 0 -100 50 H V C CNN
 F2 "" 0 0 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
+F3 "~" 0 0 50 H I C CNN
 $FPLIST
  LED*
  LED_SMD:*
@@ -101,7 +101,7 @@ DEF Device_R R 0 0 N Y 1 F N
 F0 "R" 80 0 50 V V C CNN
 F1 "Device_R" 0 0 50 V V C CNN
 F2 "" -70 0 50 V I C CNN
-F3 "" 0 0 50 H I C CNN
+F3 "~" 0 0 50 H I C CNN
 $FPLIST
  R_*
 $ENDFPLIST
@@ -118,7 +118,7 @@ DEF Jumper_SolderJumper_3_Open JP 0 0 Y N 1 F N
 F0 "JP" -100 -100 50 H V C CNN
 F1 "Jumper_SolderJumper_3_Open" 0 110 50 H V C CNN
 F2 "" 0 0 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
+F3 "~" 0 0 50 H I C CNN
 $FPLIST
  SolderJumper*Open*
 $ENDFPLIST
@@ -145,7 +145,7 @@ DEF MAX809_810_MAX809 U 0 40 Y Y 1 F N
 F0 "U" 200 -400 50 H V C CNN
 F1 "MAX809_810_MAX809" 150 -450 50 H V C CNN
 F2 "TO_SOT_Packages_SMD.pretty:SOT-23" 0 0 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
+F3 "https://datasheets.maximintegrated.com/en/ds/MAX803-MAX810Z.pdf" 0 0 50 H I C CNN
 DRAW
 S -200 -350 -200 150 0 1 0 N
 S -200 -350 200 -350 0 1 0 N

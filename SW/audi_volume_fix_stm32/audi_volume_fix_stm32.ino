@@ -2,9 +2,9 @@
 //#include <Wire.h>
 
 #include <EEPROM.h>
+//set FLASH_SIZE absed on your chip, but mostly 64 will do, this FW is 40k big for now ...
 #define FLASH_SIZE 64
 #define EEPROM_PAGE_SIZE        (uint16)0x400  /* Page size = 1KByte */
-//set this absed on your chip, but mostly 64 will do, this FW is 40k big for now ...
 #define EEPROM_PAGE0_BASE    ((uint32)(0x8000000 + FLASH_SIZE * 1024 - 2 * EEPROM_PAGE_SIZE))
 #define EEPROM_PAGE1_BASE               ((uint32)(EEPROM_PAGE0_BASE + EEPROM_PAGE_SIZE))
 

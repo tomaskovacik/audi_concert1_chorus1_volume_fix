@@ -328,14 +328,12 @@ void loop()
         sendI2C(_data); 
       }
 
-
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
         data[rdp][i] = 0;
       }
       rdp++;
       if (rdp == howmanypackets) rdp = 0;
     }
-    //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
   }
   }
 }
@@ -376,7 +374,7 @@ void restoreVolume() {
   set_unmute();
   volume = saved_volume;
   Serial.println("Restor volume. New volume: "+String(volume));
-  //savedVolume = start_volume; //set this to safe value if we fucked something in code, which I probably did :)
+  //saved_volume = start_volume; //set this to safe value if we fucked something in code, which I probably did :)
   set_volume();
   }
 }
@@ -572,11 +570,9 @@ void set_loudness()
 void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
 
   Serial.print(F("unknown display data: "));
-  // }
   for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
     Serial.print(_data[i], HEX);
     Serial.print(F(" "));
-    //    Serial.write(_data[i]);
   }
   Serial.println();
 }
@@ -624,7 +620,6 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
     case 0x13:
       //leds: whole packet: 9A 13 2E 0 29 0 0 0 0 0 0 0 0 0 0
       {
-        grab_volume = 1;
         //Serial.println(_data[2],BIN);
         if (_data[2] & B00000001) Serial.print(F("REG ")); //REG bit
         if (_data[2] & B00000010) Serial.print(F("RDS ")); //RDS bit
@@ -666,7 +661,6 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       break;
     case 0x32: //freq?
       {
-        grab_volume = 1;
         if (_data[3] == 0x10) { //AM
           uint16_t freq = 531;
           freq = freq + (_data[2] * 9);
@@ -684,7 +678,6 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       break;
     case 0x48:
       {
-        grab_volume = 1;
         Serial.print(F("display data ASCI: "));
         // }
         for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
@@ -696,7 +689,7 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
         Serial.println();
       }
       break;
-    case 0x58:
+    case 0x58: //text
       {
         grab_volume = 0;
         //54 41 20 20 20 35 20 20 0 0 0 0 0
@@ -733,11 +726,18 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
           case 4:
             Serial.println(F("TAPE:  < (FR)"));
             break;
+          case 5:
+            Serial.println(F("CONNECT"));
+            break;
           case 0:
             Serial.println(F("TAPE: Eject"));
             break;
           case 0x10:
             Serial.println(F("TP-INFO"));
+            restoreVolume();
+            break;
+          case 0x11:
+            Serial.println(F("TELEFON"));
             break;
           case 0x0B:
             Serial.println(F("SAFE"));
@@ -1006,9 +1006,8 @@ void sendI2C (uint8_t data[howmanybytesinpacket]) {
   // decode_i2c(data);
 }
 
-
-
 void decode_i2c(uint8_t data[howmanybytesinpacket]) {
+  //dump_i2c_data(data);
   uint8_t increments = 1; //at least 1 iteration of next FOR must run...
   if (data[1] > 0xf) {
     //autoincrement of subaddress:
@@ -1022,6 +1021,7 @@ void decode_i2c(uint8_t data[howmanybytesinpacket]) {
     switch (subaddress) {
       case 0:
         { // input selector
+          //muteVolume(4); //works here but it is too slow, display data are much faster
           if (input == TP) muteVolume(5); //goig from TP to what ever we going to play
           Serial.print(F("Input selector: "));
           //Serial.print(c,HEX);

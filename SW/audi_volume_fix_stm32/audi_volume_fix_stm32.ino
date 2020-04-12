@@ -971,12 +971,12 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 
         Serial.println();
         if (_data[2] == 'V' && _data[3] == 'O' && _data[4] == 'L' && _data[5] == ' ' && _data[6] == ' ' && _data[8] == ' ' && _data[9] == ' ') //"VOL  X  "
-          saveVolEeprom((uint8_t)_data[7] - 32);
+          saveVolEeprom((uint8_t)_data[7] - 0x30);
         if (_data[2] == 'T' && _data[3] == 'A' && _data[4] == ' ' && _data[5] == ' ' && _data[6] == ' ' && _data[8] == ' ' && _data[9] == ' ') //"TA     "
-          saveTaEeprom((uint8_t)_data[7]);
+          saveTaEeprom((uint8_t)_data[7] - 0x30);
         if (_data[2] == 'G' && _data[3] == 'A' && _data[4] == 'L' && _data[5] == 'A' && _data[6] == ' ') { //"GALA X  "
           if (_data[8] == ' ' && _data[9] == ' ') //GALA  1->5
-            saveVolEeprom((uint8_t)_data[7]);
+            saveVolEeprom((uint8_t)_data[7] - 0x30);
           if (_data[8] == 'O' && _data[9] == 'F' && _data[9] == 'F') //GALA OFF
             saveVolEeprom(0);
         }

@@ -9,6 +9,7 @@ Audi Chorus A8 - 7 647 243 380
 Audi Concert - 7 646 248 380 (4B0 035 186)
 Audi Concert A8 - 7 647 248 380 (4D0 035 186A)
 Audi Concert Navi - 7 647 249 380 (4B0 035 186B)
+AUDI	CONCERT TT AUZ1Z3	7 648 244 380 (4B0 035 186D)
 ```
 Maybe for these, drop me a message with pictures of radio from outside and inside, and I can check if your radio is compatible with this module:
 ```
@@ -19,7 +20,6 @@ AUDI	CHORUS M4 AUZ1Z2	7 648 245 380   4B0 035 152B
 AUDI	CHORUS M4 AUZ1Z2	7 648 245 380   4B0 035 152B
 AUDI	CONCERT A8	7 648 248 380
 AUDI	CONCERT M4 AUZ1Z3	7 648 247 380   4B0 035 186C
-AUDI	CONCERT TT AUZ1Z3	7 648 244 380   4B0 035 186D
 ```
 #### Not compatible radios
 

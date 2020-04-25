@@ -40,6 +40,8 @@ Connection ~ 2450 3950
 Connection ~ 5350 1950
 Connection ~ 4870 4650
 Connection ~ 4850 3650
+Connection ~ 12270 3650
+Connection ~ 3630 4450
 Wire Wire Line
 	1500 850  2100 850 
 Wire Wire Line
@@ -75,6 +77,8 @@ Wire Wire Line
 Wire Wire Line
 	2000 3950 1500 3950
 Wire Wire Line
+	2110 4980 2900 4980
+Wire Wire Line
 	2300 3950 2450 3950
 Wire Wire Line
 	2300 4100 2850 4100
@@ -89,6 +93,18 @@ Wire Wire Line
 Wire Wire Line
 	2450 3950 2850 3950
 Wire Wire Line
+	3200 4980 3330 4980
+Wire Wire Line
+	3630 3740 3630 3990
+Wire Wire Line
+	3630 4450 3630 4290
+Wire Wire Line
+	3630 4450 3630 4780
+Wire Wire Line
+	3630 4450 5450 4450
+Wire Wire Line
+	3630 5180 3630 5300
+Wire Wire Line
 	4150 3550 4900 3550
 Wire Wire Line
 	4150 3650 4850 3650
@@ -98,8 +114,6 @@ Wire Wire Line
 	4250 3850 4900 3850
 Wire Wire Line
 	4250 3950 4900 3950
-Wire Wire Line
-	4250 4450 4900 4450
 Wire Wire Line
 	4250 4550 4900 4550
 Wire Wire Line
@@ -156,8 +170,6 @@ Wire Wire Line
 	5200 3950 5400 3950
 Wire Wire Line
 	5200 4050 5450 4050
-Wire Wire Line
-	5200 4450 5450 4450
 Wire Wire Line
 	5200 4550 5450 4550
 Wire Wire Line
@@ -241,7 +253,9 @@ Wire Wire Line
 Wire Wire Line
 	9800 5550 10550 5550
 Wire Wire Line
-	10850 5550 11350 5550
+	10850 5550 11970 5550
+Wire Wire Line
+	11250 3650 12270 3650
 Wire Wire Line
 	11250 4150 11750 4150
 Wire Wire Line
@@ -255,10 +269,6 @@ Wire Wire Line
 Wire Wire Line
 	11250 4650 11750 4650
 Wire Wire Line
-	11250 4750 11350 4750
-Wire Wire Line
-	11350 5550 11350 4750
-Wire Wire Line
 	11600 3250 11250 3250
 Wire Wire Line
 	11900 3250 12200 3250
@@ -270,6 +280,14 @@ Wire Wire Line
 	11950 9200 11950 9300
 Wire Wire Line
 	12250 8700 11950 8700
+Wire Wire Line
+	12270 2330 12270 2580
+Wire Wire Line
+	12270 2880 12270 3650
+Wire Wire Line
+	12270 3650 12270 5350
+Wire Wire Line
+	12270 5750 12270 5870
 Wire Wire Line
 	12550 9000 12550 9300
 Wire Wire Line
@@ -392,7 +410,7 @@ Text Notes 1000 5950 0    50   ~ 0
 * not implemented yet in code, \nwill be used to write own text on display...
 Text Notes 2150 5250 2    50   ~ 0
 *
-Text Notes 4250 4500 2    50   ~ 0
+Text Notes 3860 4470 2    50   ~ 0
 *
 Text Label 1900 2650 2    50   ~ 0
 SDA_TO_TDA
@@ -406,6 +424,8 @@ Text Label 2100 1300 2    50   ~ 0
 SWDIO
 Text Label 2100 1450 2    50   ~ 0
 SWDCLK
+Text Label 2110 4980 0    50   ~ 0
+STATUS_TO_PANEL
 Text Label 2150 5450 2    50   ~ 0
 CLOCK_TO_PANEL
 Text Label 2150 5550 2    50   ~ 0
@@ -430,8 +450,6 @@ Text Label 4250 3950 0    50   ~ 0
 SDA_FROM_MOTO
 Text Label 4250 4050 0    50   ~ 0
 RESET_KA
-Text Label 4250 4450 0    50   ~ 0
-STATUS_TO_PANEL
 Text Label 4250 4550 0    50   ~ 0
 CLOCK_TO_PANEL
 Text Label 4250 4650 0    50   ~ 0
@@ -543,6 +561,17 @@ F 3 "" H 2450 3250 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
+L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR015
+U 1 1 5E9DF5EE
+P 3630 3740
+F 0 "#PWR015" H 3630 3700 30  0001 C CNN
+F 1 "3V3" H 3655 3901 60  0000 C CNN
+F 2 "" H 3630 3740 50  0001 C CNN
+F 3 "" H 3630 3740 50  0001 C CNN
+	1    3630 3740
+	1    0    0    -1  
+$EndComp
+$Comp
 L audi_concert1_chorus1_volume_fix-rescue:5V-pwr #PWR0103
 U 1 1 5AD01E63
 P 5350 5550
@@ -584,6 +613,17 @@ F 1 "5V" H 11975 8811 60  0000 C CNN
 F 2 "" H 11950 8650 50  0001 C CNN
 F 3 "" H 11950 8650 50  0001 C CNN
 	1    11950 8650
+	1    0    0    -1  
+$EndComp
+$Comp
+L audi_concert1_chorus1_volume_fix-rescue:3V3-pwr #PWR017
+U 1 1 5E9DC3BF
+P 12270 2330
+F 0 "#PWR017" H 12270 2290 30  0001 C CNN
+F 1 "3V3" H 12295 2491 60  0000 C CNN
+F 2 "" H 12270 2330 50  0001 C CNN
+F 3 "" H 12270 2330 50  0001 C CNN
+	1    12270 2330
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -664,6 +704,17 @@ F 3 "" H 1650 4550 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
+L power:GND #PWR016
+U 1 1 5E9E46CA
+P 3630 5300
+F 0 "#PWR016" H 3630 5050 50  0001 C CNN
+F 1 "GND" H 3635 5127 50  0000 C CNN
+F 2 "" H 3630 5300 50  0001 C CNN
+F 3 "" H 3630 5300 50  0001 C CNN
+	1    3630 5300
+	1    0    0    -1  
+$EndComp
+$Comp
 L power:GND #PWR0101
 U 1 1 5AD0005D
 P 6750 10600
@@ -694,6 +745,17 @@ F 1 "GND" H 11955 9127 50  0000 C CNN
 F 2 "" H 11950 9300 50  0001 C CNN
 F 3 "" H 11950 9300 50  0001 C CNN
 	1    11950 9300
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR018
+U 1 1 5E9D6061
+P 12270 5870
+F 0 "#PWR018" H 12270 5620 50  0001 C CNN
+F 1 "GND" H 12275 5697 50  0000 C CNN
+F 2 "" H 12270 5870 50  0001 C CNN
+F 3 "" H 12270 5870 50  0001 C CNN
+	1    12270 5870
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -840,6 +902,28 @@ F 3 "~" H 2450 3650 50  0001 C CNN
 	-1   0    0    -1  
 $EndComp
 $Comp
+L Device:R R17
+U 1 1 5AE4CD58
+P 3050 4980
+F 0 "R17" V 3050 4980 50  0000 C CNN
+F 1 "1k" V 3100 4830 50  0000 C CNN
+F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 2980 4980 50  0001 C CNN
+F 3 "~" H 3050 4980 50  0001 C CNN
+	1    3050 4980
+	0    -1   1    0   
+$EndComp
+$Comp
+L Device:R R23
+U 1 1 5E9DF5DF
+P 3630 4140
+F 0 "R23" V 3630 4140 50  0000 C CNN
+F 1 "10k" V 3580 3990 50  0000 C CNN
+F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 3560 4140 50  0001 C CNN
+F 3 "~" H 3630 4140 50  0001 C CNN
+	1    3630 4140
+	-1   0    0    1   
+$EndComp
+$Comp
 L Device:R R20
 U 1 1 5BE1DE4B
 P 4950 1450
@@ -928,17 +1012,6 @@ F 3 "~" H 5050 4050 50  0001 C CNN
 	0    -1   -1   0   
 $EndComp
 $Comp
-L Device:R R17
-U 1 1 5AE4CD58
-P 5050 4450
-F 0 "R17" V 5050 4450 50  0000 C CNN
-F 1 "1k" V 5100 4300 50  0000 C CNN
-F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 4980 4450 50  0001 C CNN
-F 3 "~" H 5050 4450 50  0001 C CNN
-	1    5050 4450
-	0    -1   1    0   
-$EndComp
-$Comp
 L Device:R R15
 U 1 1 5AE4CC42
 P 5050 4550
@@ -1025,6 +1098,17 @@ F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 11680 3250 50  0001 C CNN
 F 3 "~" H 11750 3250 50  0001 C CNN
 	1    11750 3250
 	0    1    1    0   
+$EndComp
+$Comp
+L Device:R R24
+U 1 1 5E9D8E83
+P 12270 2730
+F 0 "R24" V 12270 2730 50  0000 C CNN
+F 1 "10k" V 12220 2580 50  0000 C CNN
+F 2 "Resistors_SMD.pretty:R_0805_HandSoldering" V 12200 2730 50  0001 C CNN
+F 3 "~" H 12270 2730 50  0001 C CNN
+	1    12270 2730
+	-1   0    0    1   
 $EndComp
 $Comp
 L Device:R R18
@@ -1201,6 +1285,28 @@ F 2 "Pin_Headers.pretty:Pin_Header_Straight_1x03" H 1150 5550 50  0001 C CNN
 F 3 "" H 1150 5550 50  0001 C CNN
 	1    1150 5550
 	-1   0    0    1   
+$EndComp
+$Comp
+L Transistor_FET:BSS138 Q1
+U 1 1 5E9E46B8
+P 3530 4980
+F 0 "Q1" H 3736 5025 50  0000 L CNN
+F 1 "BSS138" H 3736 4935 50  0000 L CNN
+F 2 "TO_SOT_Packages_SMD:SOT-23" H 3730 4905 50  0001 L CIN
+F 3 "https://www.fairchildsemi.com/datasheets/BS/BSS138.pdf" H 3530 4980 50  0001 L CNN
+	1    3530 4980
+	1    0    0    -1  
+$EndComp
+$Comp
+L Transistor_FET:BSS138 Q2
+U 1 1 5E9D1DC2
+P 12170 5550
+F 0 "Q2" H 12376 5595 50  0000 L CNN
+F 1 "BSS138" H 12376 5505 50  0000 L CNN
+F 2 "TO_SOT_Packages_SMD:SOT-23" H 12370 5475 50  0001 L CIN
+F 3 "https://www.fairchildsemi.com/datasheets/BS/BSS138.pdf" H 12170 5550 50  0001 L CNN
+	1    12170 5550
+	1    0    0    -1  
 $EndComp
 $Comp
 L audi_concert1_chorus1_volume_fix-rescue:CONN_1x6-Connectors CON4

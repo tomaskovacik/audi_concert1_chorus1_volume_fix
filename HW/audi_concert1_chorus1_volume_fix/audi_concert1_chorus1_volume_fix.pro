@@ -1,4 +1,4 @@
-update=Ne 12. apríl 2020, 16:31:37 CEST
+update=St 22. apríl 2020, 15:56:44 CEST
 version=1
 last_client=kicad
 [general]
@@ -22,8 +22,12 @@ NetFmtName=Pcbnew
 SpiceAjustPassiveValues=0
 LabSize=50
 ERC_TestSimilarLabels=1
+[SchematicFrame]
+version=1
+[LibeditFrame]
+version=1
 [sheetnames]
-1=00000000-0000-0000-0000-00005e918ce9:
+1=00000000-0000-0000-0000-00005e962df0:
 [pcbnew]
 version=1
 PageLayoutDescrFile=

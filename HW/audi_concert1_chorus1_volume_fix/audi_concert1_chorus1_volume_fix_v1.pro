@@ -1,4 +1,4 @@
-update=Št  2. apríl 2020, 10:18:32 CEST
+update=Št 16. apríl 2020, 20:22:22 CEST
 version=1
 last_client=pcbnew
 [general]

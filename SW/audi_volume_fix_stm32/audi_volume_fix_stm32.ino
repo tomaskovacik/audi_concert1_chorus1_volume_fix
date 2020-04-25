@@ -189,6 +189,21 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]);
 void set_mute();
 void set_unmute();
 
+uint8_t setStartVolumeFromEeprom(void) {
+  switch (getVolEeprom()) {
+    case 1:
+      return 0x56; //should check it on real radio, I take this from volume map for (set_volume_up())
+    case 2:
+      return 0x52;
+    case 3:
+      return 0x4E;
+    case 4:
+      return 0x4A;
+    case 5:
+      return 0x46;
+  }
+}
+
 uint8_t getGalaEeprom(void) {
   if (checkEEPROM())
     return (uint8_t) EEPROM.read(EEPROM_GALA);

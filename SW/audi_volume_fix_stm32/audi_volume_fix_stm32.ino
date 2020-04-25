@@ -1,4 +1,4 @@
-// - config2EEPROM branch
+// - gala2 branch
 //#include <Wire.h>
 
 #include <EEPROM.h>

@@ -1,5 +1,12 @@
-// - master
+// - gala2 branch
 //#include <Wire.h>
+
+#include <EEPROM.h>
+//set FLASH_SIZE absed on your chip, but mostly 64 will do, this FW is 40k big for now ...
+#define FLASH_SIZE 64
+#define EEPROM_PAGE_SIZE        (uint16)0x400  /* Page size = 1KByte */
+#define EEPROM_PAGE0_BASE    ((uint32)(0x8000000 + FLASH_SIZE * 1024 - 2 * EEPROM_PAGE_SIZE))
+#define EEPROM_PAGE1_BASE               ((uint32)(EEPROM_PAGE0_BASE + EEPROM_PAGE_SIZE))
 
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
@@ -42,6 +49,17 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define displayDATA PB4//DATA
 #define displayRESET PB5
 
+#define EEPROM_CR1 0x01 //12
+#define EEPROM_CR2 0x02 //34
+#define EEPROM_CR3 0x03 //56
+#define EEPROM_CR4 0x04 //CRC
+#define EEPROM_GALA 0x05
+#define EEPROM_VOL 0x06
+#define EEPROM_TA 0x07
+#define EEPROM_CRC (EEPROM.read(EEPROM_CR1)+EEPROM.read(EEPROM_VOL)+EEPROM.read(EEPROM_CR2)+EEPROM.read(EEPROM_VOL)+EEPROM.read(EEPROM_CR3)+EEPROM.read(EEPROM_TA))
+#define DEFAULT_START_GALA 3
+#define DEFAULT_START_VOL 3
+#define DEFAULT_START_TA 3
 
 //this is SW i2c for arduino, did not work on STM32, cose there is some ASM woodoo :)))
 //#define DATA_IS_HIGH (PIND & (1<<PD4))
@@ -79,7 +97,7 @@ volatile uint8_t dwbp = 0; //display write byte pointer, for each dwdp there is 
 volatile uint8_t grabing_SPI = 0; //flag indicating we are busy grabing front panel display data, so we should not mess with them in main loop
 volatile uint8_t drdp = 0; //display read data pointer for front panel comunication
 
-volatile uint8_t start_volume = 0x82;
+volatile uint8_t start_volume = 0x4E;//was 0x82; //based on gala investigation start volume is 0x4E
 
 volatile uint8_t volume = start_volume; //set start volume here ...
 volatile uint8_t current_volume = start_volume; //set start volume here ..
@@ -172,9 +190,82 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]);
 void set_mute();
 void set_unmute();
 
+uint8_t setStartVolumeFromEeprom(void) {
+  switch (getVolEeprom()) {
+    case 1:
+      return 0x56; //should check it on real radio, I take this from volume map for (set_volume_up())
+    case 2:
+      return 0x52;
+    case 3:
+      return 0x4E;
+    case 4:
+      return 0x4A;
+    case 5:
+      return 0x46;
+  }
+}
+
+uint8_t getGalaEeprom(void) {
+  if (checkEEPROM())
+    return (uint8_t) EEPROM.read(EEPROM_GALA);
+}
+
+uint8_t getVolEeprom(void) {
+  if (checkEEPROM())
+    return (uint8_t)EEPROM.read(EEPROM_VOL);
+}
+
+uint8_t getTaEeprom(void) {
+  if (checkEEPROM())
+    return (uint8_t)EEPROM.read(EEPROM_TA);
+}
+
+uint8_t saveGalaEeprom(uint16_t gala) {
+  checkEEPROM(); //set defaults if no eeprom is set
+  if (gala < 0 || gala > 5) return false;
+  EEPROM.write(EEPROM_GALA, gala);
+  return EEPROM.write(EEPROM_CR4, EEPROM_CRC);
+}
+
+uint8_t saveVolEeprom(uint16_t vol) {
+  checkEEPROM();
+  if (vol < 1 || vol > 5) return false;
+  EEPROM.write(EEPROM_VOL, vol);
+  return EEPROM.write(EEPROM_CR4, EEPROM_CRC);
+}
+
+uint8_t saveTaEeprom(uint16_t ta) {
+  checkEEPROM();
+  if (ta < 1 || ta > 5) return false;
+  EEPROM.write(EEPROM_TA, ta);
+  return EEPROM.write(EEPROM_CR4, EEPROM_CRC);
+}
+
+uint8_t checkEEPROM() {
+  if (EEPROM.read(EEPROM_CR1) == 12 && EEPROM.read(EEPROM_CR2) == 34 && EEPROM.read(EEPROM_CR3) == 56 && EEPROM.read(EEPROM_CR4) == EEPROM_CRC)
+    return true;
+  EEPROM.write(EEPROM_GALA, DEFAULT_START_GALA);
+  EEPROM.write(EEPROM_VOL, DEFAULT_START_VOL);
+  EEPROM.write(EEPROM_TA, DEFAULT_START_TA);
+  EEPROM.write(EEPROM_CR1, 12);
+  EEPROM.write(EEPROM_CR2, 34);
+  EEPROM.write(EEPROM_CR3, 56);
+  EEPROM.write(EEPROM_CR4, EEPROM_CRC);
+  if (EEPROM.read(EEPROM_CR1) == 12 && EEPROM.read(EEPROM_CR2) == 34 && EEPROM.read(EEPROM_CR3) == 56 && EEPROM.read(EEPROM_CR4) == EEPROM_CRC)
+    return true;
+  return false;
+}
+
 
 void setup ()
 {
+  EEPROM.init(EEPROM_PAGE0_BASE, EEPROM_PAGE1_BASE, EEPROM_PAGE_SIZE);
+  delay(1000);
+  checkEEPROM();
+  start_volume = setStartVolumeFromEeprom();
+  volume = start_volume; //set start volume here ...
+  current_volume = start_volume; //set start volume here ..
+  saved_volume = start_volume;
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;
   volume_packet[1] = 0x02;
@@ -211,6 +302,9 @@ void printInfo(){
       Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
       Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
       Serial.print("Dumping i2c ");Serial.println((dumpI2cData ? F("enabled") : F("disabled, change by sending d")));
+      Serial.print(F("Default GALA: ")); Serial.println(getGalaEeprom());
+      Serial.print(F("Default VOLUME: ")); Serial.println(getVolEeprom());
+      Serial.print(F("Default TA volume: ")); Serial.println(getTaEeprom());
 }
 
 void loop()
@@ -715,6 +809,16 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
         Serial.write(_data[8]);
         Serial.write(_data[9]);
         Serial.println();
+        if (_data[2] == 'V' && _data[3] == 'O' && _data[4] == 'L' && _data[5] == ' ' && _data[6] == ' ' && _data[8] == ' ' && _data[9] == ' ') //"VOL  X  "
+          saveVolEeprom((uint8_t)_data[7] - 0x30);
+        if (_data[2] == 'T' && _data[3] == 'A' && _data[4] == ' ' && _data[5] == ' ' && _data[6] == ' ' && _data[8] == ' ' && _data[9] == ' ') //"TA     "
+          saveTaEeprom((uint8_t)_data[7] - 0x30);
+        if (_data[2] == 'G' && _data[3] == 'A' && _data[4] == 'L' && _data[5] == 'A' && _data[6] == ' ') { //"GALA X  "
+          if (_data[8] == ' ' && _data[9] == ' ') //GALA  1->5
+            saveVolEeprom((uint8_t)_data[7] - 0x30);
+          if (_data[8] == 'O' && _data[9] == 'F' && _data[9] == 'F') //GALA OFF
+            saveVolEeprom(0);
+        }
       }
       break;
     case 0x61:

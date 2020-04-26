@@ -99,7 +99,7 @@ uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
 uint8_t displayRESETstate = 0;
-uint8_t dumpI2cDataAndDoNotFix = 0;
+uint8_t dumpI2cData = 0;
 /*
    functions
 */
@@ -210,7 +210,7 @@ void printInfo(){
       Serial.println(F("(C) kovo, GPL3"));
       Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
       Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
-      Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
+      Serial.print("Dumping i2c ");Serial.println((dumpI2cData ? F("enabled") : F("disabled, change by sending d")));
 }
 
 void loop()
@@ -221,7 +221,7 @@ void loop()
       case 'D':
       case 'd':
       {
-        dumpI2cDataAndDoNotFix = !dumpI2cDataAndDoNotFix;
+        dumpI2cData = !dumpI2cData;
         printInfo();
       }
       break;
@@ -258,7 +258,7 @@ void loop()
       if (_data[0] == 0x25)//button push
       {
         decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
-        if (!dumpI2cDataAndDoNotFix) {
+        if (!dumpI2cData) {
           if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1]== PANEL_REMOTE_VOLUME_UP)) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
             set_volume_up();
             set_loudness();
@@ -293,7 +293,7 @@ void loop()
         //Serial.print(_data[i],HEX); Serial.print(" ");
       }
       //Serial.println();
-      if (!dumpI2cDataAndDoNotFix) {
+      if (dumpI2cData) dump_i2c_data(_data);
         if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {//volume was set by panel, and is probably fucked :) , only fixing volume packet, subbaddress = ?
           Serial.println(F("volume or loudness IGNORING!"));
           //send_volume();
@@ -329,11 +329,6 @@ void loop()
         } else {
           sendI2C(_data);
         }
-      } else { //dumpI2cDataAndDoNotFix - we are gonna just dump data
-        Serial.print(millis()+String(" [")); dump_i2c_data(_data); Serial.print(F("] "));
-        sendI2C(_data); 
-      }
-
 
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
         data[rdp][i] = 0;
@@ -582,14 +577,14 @@ void send_loudness()
 
 void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
 
-  Serial.print(F("unknown display data: "));
-  // }
+  Serial.print(F("I2c data: [ "));
+
   for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
     Serial.print(_data[i], HEX);
     Serial.print(F(" "));
-    //    Serial.write(_data[i]);
   }
-  Serial.println();
+
+  Serial.println(F(" ]"));
 }
 
 /*

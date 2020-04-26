@@ -1,4 +1,4 @@
-// - gala2 branch
+// - devel branch
 //#include <Wire.h>
 
 #include <EEPROM.h>
@@ -11,12 +11,12 @@
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
 #include <SlowSoftWire.h> //so we do not have single lib for slave/master, so we have to init another one for master .... cose we do not have 3HW i2c .... tiktak ...
+
 #include "audi_concert_panel.h"
 
 SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 
 //TwoWire Swire = TwoWire(PB11, PB10);
-
 
 /*
     SPI comunication between motorola MC68HC05B32 cpu to front panel ST6280
@@ -48,6 +48,11 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define displaySTATUS PA15 //STATUS/CS
 #define displayDATA PB4//DATA
 #define displayRESET PB5
+
+//use PA14 for V1 board
+#define GALA PA14 //SWDCLK pin, exposed on version one boards
+//PA0 for V2
+//#define GALA PA0
 
 #define EEPROM_CR1 0x01 //12
 #define EEPROM_CR2 0x02 //34
@@ -112,12 +117,17 @@ volatile uint8_t grab_volume = 1;
 
 volatile uint8_t mute = 0;
 
+volatile uint8_t _gala = 3;
+
+volatile uint16_t captime; // timer count of low pulse (temp)
 
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
 uint8_t displayRESETstate = 0;
 uint8_t dumpI2cData = 0;
+
+uint16_t previous_speed, current_speed;
 /*
    functions
 */
@@ -205,6 +215,17 @@ uint8_t setStartVolumeFromEeprom(void) {
   }
 }
 
+uint16_t getGalaStartSpeed(void) {
+  /*
+     GALA = 1 -> 100-(1-1)*15 = 100 -  0 = 100
+     GALA = 2 -> 100-(2-1)*15 = 100 - 15 =  85
+     GALA = 3 -> 100-(3-1)*15 = 100 - 30 =  70
+     GALA = 4 -> 100-(4-1)*15 = 100 - 45 =  55
+     GALA = 5 -> 100-(5-1)*15 = 100 - 60 =  40
+  */
+  return (100 - ((getGalaEeprom() - 1) * 15));
+}
+
 uint8_t getGalaEeprom(void) {
   if (checkEEPROM())
     return (uint8_t) EEPROM.read(EEPROM_GALA);
@@ -256,6 +277,17 @@ uint8_t checkEEPROM() {
   return false;
 }
 
+void galaRising(void) {
+  Timer2.resume(); // let timer 2 run
+  //detachInterrupt(digitalPinToInterrupt(GALA));
+  attachInterrupt(digitalPinToInterrupt(GALA), galaFalling, FALLING); //
+}
+
+void galaFalling(void) {
+  Timer2.pause();
+  //detachInterrupt(digitalPinToInterrupt(GALA));
+  captime = Timer2.getCount();
+}
 
 void setup ()
 {
@@ -287,12 +319,18 @@ void setup ()
   pinMode(displayDATA, INPUT_PULLUP);
   pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data send betwen display and main CPU
-
+  pinMode(GALA, INPUT_PULLUP);
   //serial for debug
   Serial.begin(115200);
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
   //        Serial.println(F("I2C init failed");
+
+  Timer2.setPrescaleFactor(72); // 1 microsecond resolution
+  Timer2.refresh();
+  Timer2.setCount(0);
+  attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING);
+
 }  // end of setup
 
 void printInfo(){
@@ -311,7 +349,7 @@ void loop()
 {
   if (Serial.available()) {
     char serial_char = Serial.read();
-    switch (serial_char){
+    switch (serial_char) {
       case 'D':
       case 'd':
       {
@@ -333,6 +371,10 @@ void loop()
   if (digitalRead(displayRESET) && !displayRESETstate) {
     Serial.println("Reset HIGH");
     displayRESETstate = 1;
+    start_volume = setStartVolumeFromEeprom();
+    volume = start_volume; //set start volume here ...
+    current_volume = start_volume; //set start volume here ..
+    saved_volume = start_volume;
   }
   if (!digitalRead(displayRESET) && displayRESETstate) {
     Serial.println("Reset LOW");
@@ -352,13 +394,13 @@ void loop()
       if (_data[0] == 0x25)//button push
       {
         decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
-          if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1]== PANEL_REMOTE_VOLUME_UP)) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
+          if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
             set_volume_up();
             set_loudness();
             send_volume();
             send_loudness();
           }
-          if (grab_volume == 1 &&  (_data[1] == PANEL_KNOB_DOWN || _data[1]== PANEL_REMOTE_VOLUME_DOWN)) { //some as previous but nob goes down
+          if (grab_volume == 1 &&  (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) { //some as previous but nob goes down
             set_volume_down();
             set_loudness();
             send_volume();
@@ -393,7 +435,7 @@ void loop()
           Serial.println(F("MUTE "));
           if ((_data[2] & B00000001)) {
             //2 8 81
-            //Serial.println(F("Muting")); dump_i2c_data(_data);
+            //Serial.printlnTimer2.setPolarity(TIMER_CH2, 1);(F("Muting")); dump_i2c_data(_data);
             if (!mute) { //we are not already muted
               mute = 1; //set mute flag
               saved_volume = current_volume;//save current volume
@@ -429,6 +471,127 @@ void loop()
       if (rdp == howmanypackets) rdp = 0;
     }
     //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
+  }
+  if (getGalaEeprom() && captime > 0) {//gala or captime is not 0
+    current_speed = 1000000 / (2 * captime);
+    if (previous_speed != current_speed) {
+      //goig up
+      uint16_t galaStartSpeed = getGalaStartSpeed();
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      galaStartSpeed += 30; //+30
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        loudness--;
+        send_loudness();
+      }
+      galaStartSpeed += 30; //+60
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      galaStartSpeed += 30; //+90
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        loudness--;
+        send_loudness();
+      }
+      galaStartSpeed += 30; //+120
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      galaStartSpeed += 30; //+150
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        loudness--;
+        send_loudness();
+      }
+      galaStartSpeed += 30; //+180
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      galaStartSpeed += 30; //+210
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        loudness--;
+        send_loudness();
+      }
+      galaStartSpeed += 30; //+240
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      galaStartSpeed += 30; //+270
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        loudness--;
+        send_loudness();
+      }
+      galaStartSpeed += 30; //+300 //355 max :D :D :D
+      if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
+        set_volume_up();
+        send_volume();
+      }
+      //slowing down
+      //+300
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+      galaStartSpeed -= 30; //+270
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        loudness++;
+        send_loudness();
+      }
+      galaStartSpeed -= 30; //+240
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+      galaStartSpeed -= 30; //+210
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        loudness++;
+        send_loudness();
+      }
+      galaStartSpeed -= 30; //+180
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+      galaStartSpeed -= 30; //+150
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        loudness++;
+        send_loudness();
+      }
+      galaStartSpeed -= 30; //+120
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+      galaStartSpeed -= 30; //+90
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        loudness++;
+        send_loudness();
+      }
+      galaStartSpeed -= 30; //+60
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+      galaStartSpeed -= 30; //+30
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        loudness++;
+        send_loudness();
+      }
+      galaStartSpeed -= 30; //+0
+      if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
+        set_volume_down();
+        send_volume();
+      }
+    }
+    previous_speed = current_speed;
+    Timer2.setCount(0);
+    captime = 0;
+    attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING); //
   }
 }
 
@@ -604,8 +767,6 @@ void send_volume() {
     }
 
     volume_packet[2] = current_volume;
-    set_loudness();
-    send_loudness();
     sendI2C(volume_packet);
 
     delay(1);
@@ -817,6 +978,7 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
           if (_data[8] == 'O' && _data[9] == 'F' && _data[9] == 'F') //GALA OFF
             saveVolEeprom(0);
         }
+
       }
       break;
     case 0x61:
@@ -1471,22 +1633,22 @@ void decode_button_push(uint8_t data) {
     case PANEL_REMOTE_VOLUME_UP:
       Serial.println(F("Remote volume up"));
       break;
-case PANEL_REMOTE_VOLUME_DOWN:
+    case PANEL_REMOTE_VOLUME_DOWN:
       Serial.println(F("Remote volume down"));
       break;
-case PANEL_REMOTE_RIGHT:
+    case PANEL_REMOTE_RIGHT:
       Serial.println(F("Remote right"));
       break;
-case PANEL_REMOTE_LEFT:
+    case PANEL_REMOTE_LEFT:
       Serial.println(F("Remote left"));
       break;
-case PANEL_REMOTE_UP:
+    case PANEL_REMOTE_UP:
       Serial.println(F("Remote up"));
       break;
-case PANEL_REMOTE_DOWN:
+    case PANEL_REMOTE_DOWN:
       Serial.println(F("Remote down"));
       break;
-case PANEL_START:
+    case PANEL_START:
       Serial.println(F("Panel start"));
       break;
     default:

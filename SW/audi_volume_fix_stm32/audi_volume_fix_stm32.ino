@@ -352,7 +352,6 @@ void loop()
       if (_data[0] == 0x25)//button push
       {
         decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
-        if (!dumpI2cData) {
           if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1]== PANEL_REMOTE_VOLUME_UP)) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
             set_volume_up();
             set_loudness();
@@ -365,7 +364,6 @@ void loop()
             send_volume();
             send_loudness();
           }
-        }
       }
       if (_data[0] == 0x9A) { // packet starting with 0x95 is update for pannel, text, indications leds ....
         decode_display_data(_data);

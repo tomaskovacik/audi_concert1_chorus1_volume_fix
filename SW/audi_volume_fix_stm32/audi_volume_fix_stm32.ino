@@ -117,8 +117,6 @@ volatile uint8_t grab_volume = 1;
 
 volatile uint8_t mute = 0;
 
-volatile uint8_t _gala = 3;
-
 volatile uint16_t captime; // timer count of low pulse (temp)
 
 uint8_t volume_packet[howmanybytesinpacket];

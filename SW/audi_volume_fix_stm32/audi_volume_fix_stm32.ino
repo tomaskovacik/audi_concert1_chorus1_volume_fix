@@ -505,19 +505,16 @@ void send_volume() {
     if (current_volume > volume ) { //current volume is more then volume , so we are turning volume up, step is 2
       if ((current_volume - volume) == 1) current_volume = volume;
       else current_volume = current_volume - 2;
-      volume_packet[2] = current_volume;
-      set_loudness();
-      send_loudness();
-      sendI2C(volume_packet);
     }
     if (current_volume < volume) { //current volume is less then volume , so we are turning volume down, step is 4 but some steps are more not divadeble by 4 (from a4 to be, for example)
       if ((volume - current_volume) == 1) current_volume = volume;
       else current_volume = current_volume + 2; //so we stick to 2
-      volume_packet[2] = current_volume;
-      set_loudness();
-      send_loudness();
-      sendI2C(volume_packet);
     }
+
+    volume_packet[2] = current_volume;
+    set_loudness();
+    send_loudness();
+    sendI2C(volume_packet);
 
     delay(1);
 

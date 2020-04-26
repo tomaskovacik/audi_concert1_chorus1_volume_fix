@@ -118,7 +118,7 @@ void decode_i2c(uint8_t data[howmanybytesinpacket]);
    yeh this would one day fix fked volume based on data we have from front panel and so on...
 */
 void send_volume();
-void send_loudness();
+void set_loudness();
 void send_loudness();
 
 /*

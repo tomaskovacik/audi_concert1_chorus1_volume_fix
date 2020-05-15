@@ -32,15 +32,15 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 
 */
 //ARDUINO
-//#define displayCLK 3 //CLK
-//#define displaySTATUS 2 //STATUS/CS
-//#define displayDATA 4 //PD2 - DATA
-//#define displayRESET 8
+//#define mcuCLK 3 //CLK
+//#define mcuSTATUS 2 //STATUS/CS
+//#define mcuDATA 4 //PD2 - DATA
+//#define mcuRESET 8
 //STM32
-#define displayCLK PB3 //CLK
-#define displaySTATUS PA15 //STATUS/CS
-#define displayDATA PB4//DATA
-#define displayRESET PB5
+#define mcuCLK PB3 //CLK
+#define mcuSTATUS PA15 //STATUS/CS
+#define mcuDATA PB4//DATA
+#define mcuRESET PB5
 
 
 //this is SW i2c for arduino, did not work on STM32, cose there is some ASM woodoo :)))
@@ -98,7 +98,7 @@ volatile uint8_t mute = 0;
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
-uint8_t displayRESETstate = 0;
+uint8_t mcuRESETstate = 0;
 uint8_t dumpI2cDataAndDoNotFix = 0;
 /*
    functions
@@ -189,11 +189,11 @@ void setup ()
   //    loudness_packet[i] = 0;
   //  }
   //init pins for display SPI
-  pinMode(displaySTATUS, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(displaySTATUS), enableInteruptOnCLK, RISING);
-  pinMode(displayCLK, INPUT_PULLUP);
-  pinMode(displayDATA, INPUT_PULLUP);
-  pinMode(displayRESET, INPUT);
+  pinMode(mcuSTATUS, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING);
+  pinMode(mcuCLK, INPUT_PULLUP);
+  pinMode(mcuDATA, INPUT_PULLUP);
+  pinMode(mcuRESET, INPUT);
   //init interrupt on STATUS line to grab data send betwen display and main CPU
 
   //serial for debug
@@ -235,13 +235,13 @@ void loop()
       break;
     }
   }
-  if (digitalRead(displayRESET) && !displayRESETstate) {
+  if (digitalRead(mcuRESET) && !mcuRESETstate) {
     Serial.println("Reset HIGH");
-    displayRESETstate = 1;
+    mcuRESETstate = 1;
   }
-  if (!digitalRead(displayRESET) && displayRESETstate) {
+  if (!digitalRead(mcuRESET) && mcuRESETstate) {
     Serial.println("Reset LOW");
-    displayRESETstate = 0;
+    mcuRESETstate = 0;
     wdp = rdp = dwdp = drdp = 0;
   }
   if (!grabing_SPI) { //no data are send on SPI line
@@ -897,8 +897,8 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 //enable RISING interupt on CLK line when STATUS line RISED
 void enableInteruptOnCLK()
 {
-  if (digitalRead(displayCLK)) {
-    detachInterrupt(digitalPinToInterrupt(displaySTATUS)); //we need  to do this, cose otherwise it's doing strange things
+  if (digitalRead(mcuCLK)) {
+    detachInterrupt(digitalPinToInterrupt(mcuSTATUS)); //we need  to do this, cose otherwise it's doing strange things
 
     //CLK is HIGH, this is end of  packet
     while (dwbp < howmanybytesinpacket) { //clean array from current write pointer to end of packet
@@ -907,35 +907,35 @@ void enableInteruptOnCLK()
     dwbp = 0; //set byte write pointer to begining
     dwdp++; //increment write pointer
     if (dwdp == howmanypackets) dwdp = 0; //if we reach last+1 position in array for packet, go back to 0
-    attachInterrupt(digitalPinToInterrupt(displaySTATUS), enableInteruptOnCLK, RISING); //enable this interrupt again, with same parameters
+    attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING); //enable this interrupt again, with same parameters
     //after this interupt is still set to rising on STATUS line,
     grabing_SPI = 0;//we are safe to manipulate data in main loop, I just move this from disableInteruptOnCLK function
   } else {
     //clk is low, start of packet
-    attachInterrupt(digitalPinToInterrupt(displaySTATUS), disableInteruptOnCLK, FALLING); //seting falling interupt on STATE line, indicating end of byte transfer
+    attachInterrupt(digitalPinToInterrupt(mcuSTATUS), disableInteruptOnCLK, FALLING); //seting falling interupt on STATE line, indicating end of byte transfer
     _byte = 0; //new data, zeroing temporary variable used to clock in data , just to be sure
     grabing_SPI = 1;//set grabit flag to avoid messing with live packet data in main loop
-    attachInterrupt(digitalPinToInterrupt(displayCLK), readCLK, RISING); //enabling interupt on CLK like, to grab data after each fire of this int routine
+    attachInterrupt(digitalPinToInterrupt(mcuCLK), readCLK, RISING); //enabling interupt on CLK like, to grab data after each fire of this int routine
   }
 }
 
 //disable CLK interupt while STATUS is low
 void disableInteruptOnCLK()
 {
-  detachInterrupt(digitalPinToInterrupt(displayCLK)); //so STATUS is low, so all data are clocked in:
+  detachInterrupt(digitalPinToInterrupt(mcuCLK)); //so STATUS is low, so all data are clocked in:
   _msg[dwdp][dwbp++] = _byte; //move data from tempporary variable to array based on pointer of current packet and current byte in packet
   if (dwbp == howmanybytesinpacket ) { //this can happend, but it must be last byte in packet, otherwise we will rewrite data in packet row
     dwbp = 0;
     Serial.println(F("dwbp overflow"));//put this out, just to know,
   }
   //grabing_SPI = 0;//we are safe to manipulate data in main loop, I just move this to enableInteruptOnCLK function to part wich indicate end of packet transfer
-  attachInterrupt(digitalPinToInterrupt(displaySTATUS), enableInteruptOnCLK, RISING);// enable RISING interupt on STATE line, indicating start of transmition of data
+  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING);// enable RISING interupt on STATE line, indicating start of transmition of data
 }
 
 void readCLK()
 {
-  // Serial.println(digitalRead(displayDATA),DEC);
-  if (digitalRead(displayDATA)) {
+  // Serial.println(digitalRead(mcuDATA),DEC);
+  if (digitalRead(mcuDATA)) {
     // if (DATA_IS_HIGH) {
     //Serial.print(1);
     _byte = (_byte << 1) | 1;

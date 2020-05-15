@@ -35,12 +35,12 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 //#define mcuCLK 3 //CLK
 //#define mcuSTATUS 2 //STATUS/CS
 //#define mcuDATA 4 //PD2 - DATA
-//#define mcuRESET 8
+//#define displayRESET 8
 //STM32
 #define mcuCLK PB3 //CLK
 #define mcuSTATUS PA15 //STATUS/CS
 #define mcuDATA PB4//DATA
-#define mcuRESET PB5
+#define displayRESET PB5
 
 
 //this is SW i2c for arduino, did not work on STM32, cose there is some ASM woodoo :)))
@@ -98,7 +98,7 @@ volatile uint8_t mute = 0;
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
-uint8_t mcuRESETstate = 0;
+uint8_t displayRESETstate = 0;
 uint8_t dumpI2cDataAndDoNotFix = 0;
 /*
    functions
@@ -193,7 +193,7 @@ void setup ()
   attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING);
   pinMode(mcuCLK, INPUT_PULLUP);
   pinMode(mcuDATA, INPUT_PULLUP);
-  pinMode(mcuRESET, INPUT);
+  pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data send betwen display and main CPU
 
   //serial for debug
@@ -235,13 +235,13 @@ void loop()
       break;
     }
   }
-  if (digitalRead(mcuRESET) && !mcuRESETstate) {
+  if (digitalRead(displayRESET) && !displayRESETstate) {
     Serial.println("Reset HIGH");
-    mcuRESETstate = 1;
+    displayRESETstate = 1;
   }
-  if (!digitalRead(mcuRESET) && mcuRESETstate) {
+  if (!digitalRead(displayRESET) && displayRESETstate) {
     Serial.println("Reset LOW");
-    mcuRESETstate = 0;
+    displayRESETstate = 0;
     wdp = rdp = dwdp = drdp = 0;
   }
   if (!grabing_SPI) { //no data are send on SPI line

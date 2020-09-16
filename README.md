@@ -46,12 +46,7 @@ Module in action: <a href="https://youtu.be/YbFa_UYPMRQ"></a>
 
 Schematics in <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/master/HW/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.pdf">pdf</a>.
 
-Assemble plan:
-
-for old v1:
-<img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/HW/audi_concert1_chorus1_volume_fix/assemble_plan1_0.png">
-
-for latest v4 it is <a href="https://tomaskovacik.github.io/audi_concert1_chorus1_volume_fix/HW/audi_concert1_chorus1_volume_fix/bom_v4_for_v1_code/ibom.html">here<a/>, components with value prefi NP_ are not required (not populated). These are there for future features. 1k_GALA resistor has to be populated if SW with <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/gala/SW/audi_volume_fix_stm32/audi_volume_fix_stm32.ino">gala</a> support is used (SW from gala branch).
+Assemble plan for latest v4 is <a href="https://tomaskovacik.github.io/audi_concert1_chorus1_volume_fix/HW/audi_concert1_chorus1_volume_fix/bom_v4_for_v1_code/ibom.html">here<a/>. Components with value prefi NP_ are not required (not populated). These are there for future features. 1k_GALA resistor has to be populated if SW with <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/gala/SW/audi_volume_fix_stm32/audi_volume_fix_stm32.ino">gala</a> support is used (SW from gala branch). AP for old v1 hw is <a href="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/HW/audi_concert1_chorus1_volume_fix/assemble_plan1_0.png">here</a>.
 
 
 Pictures of finished product:

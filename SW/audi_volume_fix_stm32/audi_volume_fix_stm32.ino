@@ -1,7 +1,7 @@
 // - GALAbranch
 //#include <Wire.h>
 
-//#define HWV4
+#define HWV4
 #include <EEPROM.h>
 //set FLASH_SIZE absed on your chip, but mostly 64 will do, this FW is 40k big for now ...
 #define FLASH_SIZE 64
@@ -50,16 +50,17 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define mcuDATA PB4//DATA
 #ifdef HWV4
 #define displayRESET PB8
+//PA0 for V2 up
+#define GALA PA0
 #else
 #define displayRESET PB5
-#endif
 
 #define ENABLE_GALA_IN_VERSION_1
 
 //use PA14 for V1 board
 #define GALA PA14 //SWDCLK pin, exposed on version one boards
-//PA0 for V2
-//#define GALA PA0
+#endif
+
 
 
 #define EEPROM_CR1 0x01 //12
@@ -69,7 +70,7 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define EEPROM_GALA 0x05
 #define EEPROM_VOL 0x06
 #define EEPROM_TA 0x07
-#define EEPROM_CRC (EEPROM.read(EEPROM_CR1)+EEPROM.read(EEPROM_VOL)+EEPROM.read(EEPROM_CR2)+EEPROM.read(EEPROM_VOL)+EEPROM.read(EEPROM_CR3)+EEPROM.read(EEPROM_TA))
+#define EEPROM_CRC (EEPROM.read(EEPROM_CR1)+EEPROM.read(EEPROM_GALA)+EEPROM.read(EEPROM_CR2)+EEPROM.read(EEPROM_VOL)+EEPROM.read(EEPROM_CR3)+EEPROM.read(EEPROM_TA))
 #define DEFAULT_START_GALA 3
 #define DEFAULT_START_VOL 3
 #define DEFAULT_START_TA 3
@@ -992,9 +993,9 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
           saveTaEeprom((uint8_t)_data[7] - 0x30);
         if (_data[2] == 'G' && _data[3] == 'A' && _data[4] == 'L' && _data[5] == 'A' && _data[6] == ' ') { //"GALA X  "
           if (_data[8] == ' ' && _data[9] == ' ') //GALA  1->5
-            saveVolEeprom((uint8_t)_data[7] - 0x30);
-          if (_data[8] == 'O' && _data[9] == 'F' && _data[9] == 'F') //GALA OFF
-            saveVolEeprom(0);
+            saveGalaEeprom((uint8_t)_data[7] - 0x30);
+          if (_data[7] == 'O' && _data[8] == 'F' && _data[9] == 'F') //GALA OFF
+            saveGalaEeprom(0);
         }
 
       }

@@ -9,6 +9,7 @@ Audi Chorus A8 - 7 647 243 380
 Audi Concert - 7 646 248 380 (4B0 035 186)
 Audi Concert A8 - 7 647 248 380 (4D0 035 186A)
 Audi Concert Navi - 7 647 249 380 (4B0 035 186B)
+AUDI	CONCERT TT AUZ1Z3	7 648 244 380 (4B0 035 186D)
 ```
 Maybe for these, drop me a message with pictures of radio from outside and inside, and I can check if your radio is compatible with this module:
 ```
@@ -19,7 +20,6 @@ AUDI	CHORUS M4 AUZ1Z2	7 648 245 380   4B0 035 152B
 AUDI	CHORUS M4 AUZ1Z2	7 648 245 380   4B0 035 152B
 AUDI	CONCERT A8	7 648 248 380
 AUDI	CONCERT M4 AUZ1Z3	7 648 247 380   4B0 035 186C
-AUDI	CONCERT TT AUZ1Z3	7 648 244 380   4B0 035 186D
 ```
 #### Not compatible radios
 
@@ -48,7 +48,10 @@ Schematics in <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_vol
 
 Assemble plan:
 
+for old v1:
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/HW/audi_concert1_chorus1_volume_fix/assemble_plan1_0.png">
+
+for latest v4 it is <a href="https://tomaskovacik.github.io/audi_concert1_chorus1_volume_fix/HW/audi_concert1_chorus1_volume_fix/bom_v4_for_v1_code/ibom.html">here<a/>, components with value prefi NP_ are not required (not populated). These are there for future features. 1k_GALA resistor has to be populated if SW with <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/gala/SW/audi_volume_fix_stm32/audi_volume_fix_stm32.ino">gala</a> support is used (SW from gala branch).
 
 
 Pictures of finished product:

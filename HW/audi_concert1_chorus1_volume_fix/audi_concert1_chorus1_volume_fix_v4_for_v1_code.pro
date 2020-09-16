@@ -1,4 +1,4 @@
-update=Ne 26. júl 2020, 16:58:56 CEST
+update=St 16. september 2020, 12:39:16 CEST
 version=1
 last_client=kicad
 [general]
@@ -12,26 +12,12 @@ NetIExt=net
 version=1
 LibDir=
 [eeschema/libraries]
-[schematic_editor]
-version=1
-PageLayoutDescrFile=
-PlotDirectoryName=/home/nail/src/audi_concert1_chorus1_volume_fix/HW/standalone/audi_concert1_chorus1_volume_fix/
-SubpartIdSeparator=0
-SubpartFirstId=65
-NetFmtName=Pcbnew
-SpiceAjustPassiveValues=0
-LabSize=50
-ERC_TestSimilarLabels=1
-[SchematicFrame]
-version=1
-[LibeditFrame]
-version=1
 [sheetnames]
-1=8ef7ad00-78f2-4126-bc63-102c1b6584ad:
+1=cd7a3180-b46f-4744-9b84-f3e941c23908:
 [pcbnew]
 version=1
 PageLayoutDescrFile=
-LastNetListRead=audi_concert1_chorus1_volume_fix.net
+LastNetListRead=
 LastSTEPExportPath=
 LastIDFExportPath=
 LastVRMLExportPath=

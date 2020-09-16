@@ -51,7 +51,7 @@ Assemble plan:
 for old v1:
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/HW/audi_concert1_chorus1_volume_fix/assemble_plan1_0.png">
 
-for latest v4 it is <a href="https://tomaskovacik.github.io/audi_concert1_chorus1_volume_fix/HW/audi_concert1_chorus1_volume_fix/bom_v4_for_v1_code/ibom.html">here<a/>.
+for latest v4 it is <a href="https://tomaskovacik.github.io/audi_concert1_chorus1_volume_fix/HW/audi_concert1_chorus1_volume_fix/bom_v4_for_v1_code/ibom.html">here<a/>, components with value prefi NP_ are not required (not populated). These are there for future features. 1k_GALA resistor has to be populated if SW with <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/gala/SW/audi_volume_fix_stm32/audi_volume_fix_stm32.ino">gala</a> support is used (SW from gala branch).
 
 
 Pictures of finished product:

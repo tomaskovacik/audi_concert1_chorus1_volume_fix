@@ -1,4 +1,4 @@
-update=Ne 26. júl 2020, 16:58:56 CEST
+update=St 16. september 2020, 18:09:55 CEST
 version=1
 last_client=kicad
 [general]
@@ -12,22 +12,10 @@ NetIExt=net
 version=1
 LibDir=
 [eeschema/libraries]
-[schematic_editor]
-version=1
-PageLayoutDescrFile=
-PlotDirectoryName=/home/nail/src/audi_concert1_chorus1_volume_fix/HW/standalone/audi_concert1_chorus1_volume_fix/
-SubpartIdSeparator=0
-SubpartFirstId=65
-NetFmtName=Pcbnew
-SpiceAjustPassiveValues=0
-LabSize=50
-ERC_TestSimilarLabels=1
 [SchematicFrame]
 version=1
 [LibeditFrame]
 version=1
-[sheetnames]
-1=8ef7ad00-78f2-4126-bc63-102c1b6584ad:
 [pcbnew]
 version=1
 PageLayoutDescrFile=
@@ -363,3 +351,27 @@ uViaDrill=0.1
 dPairWidth=0.2
 dPairGap=0.25
 dPairViaGap=0.25
+[sheetnames]
+1=b8838070-2d30-463e-b5e8-ba17e8b8f787:
+[schematic_editor]
+version=1
+PageLayoutDescrFile=
+PlotDirectoryName=./
+NetFmtName=Pcbnew
+SpiceAjustPassiveValues=0
+SubpartIdSeparator=0
+SubpartFirstId=65
+LabSize=50
+TextOffsetRatio=0.3
+LineThickness=6
+BusThickness=12
+WireThickness=6
+PinSymbolSize=25
+JunctionSize=40
+FieldNameTemplates=(templatefields)
+ERC_TestSimilarLabels=1
+ERC_CheckUniqueGlobalLabels=1
+ERC_CheckBusDriverConflicts=1
+ERC_CheckBusEntryConflicts=1
+ERC_CheckBusToBusConflicts=1
+ERC_CheckBusToNetConflicts=1

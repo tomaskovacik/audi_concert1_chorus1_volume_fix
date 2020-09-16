@@ -7,7 +7,7 @@
   (title_block
     (title "Volume fix for audi concert1/chorus1 made by Blaupunkt")
     (date "2018-09-21")
-    (rev "2.0")
+    (rev "4.0")
     (comment 1 "Standalone version")
     (comment 2 "Author: Tomas Kovacik")
   )

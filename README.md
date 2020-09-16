@@ -48,7 +48,10 @@ Schematics in <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_vol
 
 Assemble plan:
 
+for old v1:
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/HW/audi_concert1_chorus1_volume_fix/assemble_plan1_0.png">
+
+for latest v4 it is <a href="https://tomaskovacik.github.io/audi_concert1_chorus1_volume_fix/HW/audi_concert1_chorus1_volume_fix/bom_v4_for_v1_code/ibom.html">here<a/>.
 
 
 Pictures of finished product:

@@ -1,6 +1,8 @@
 // - master
 //#include <Wire.h>
 
+//#define HWV4
+
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
 #include <SlowSoftWire.h> //so we do not have single lib for slave/master, so we have to init another one for master .... cose we do not have 3HW i2c .... tiktak ...
@@ -40,7 +42,11 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define mcuCLK PB3 //CLK
 #define mcuSTATUS PA15 //STATUS/CS
 #define mcuDATA PB4//DATA
+#ifdef HWV4
+#define displayRESET PB8
+#else
 #define displayRESET PB5
+#endif
 
 
 //this is SW i2c for arduino, did not work on STM32, cose there is some ASM woodoo :)))

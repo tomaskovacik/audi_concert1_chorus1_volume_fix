@@ -307,6 +307,7 @@ void galaFalling(void) {
     captime = captime/1000;
     current_speed = 500000 / captime; //was: 1000000 / (2* captime)
     captime_count=1000;
+    captime=0;
   } 
 
 }

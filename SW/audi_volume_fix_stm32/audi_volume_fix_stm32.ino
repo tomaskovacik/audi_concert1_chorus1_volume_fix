@@ -222,6 +222,7 @@ uint8_t setStartVolumeFromEeprom(void) {
     case 5:
       return 0x46;
   }
+  return 0x4E;
 }
 
 uint16_t getGalaStartSpeed(void) {
@@ -238,16 +239,19 @@ uint16_t getGalaStartSpeed(void) {
 uint8_t getGalaEeprom(void) {
   if (checkEEPROM())
     return (uint8_t) EEPROM.read(EEPROM_GALA);
+  return DEFAULT_START_GALA;
 }
 
 uint8_t getVolEeprom(void) {
   if (checkEEPROM())
     return (uint8_t)EEPROM.read(EEPROM_VOL);
+  return DEFAULT_START_VOL;
 }
 
 uint8_t getTaEeprom(void) {
   if (checkEEPROM())
     return (uint8_t)EEPROM.read(EEPROM_TA);
+  return DEFAULT_START_TA;
 }
 
 uint8_t saveGalaEeprom(uint16_t gala) {

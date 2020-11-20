@@ -252,7 +252,7 @@ uint8_t getTaEeprom(void) {
 
 uint8_t saveGalaEeprom(uint16_t gala) {
   checkEEPROM(); //set defaults if no eeprom is set
-  if (gala < 0 || gala > 5) return false;
+  if (gala > 5) return false;
   EEPROM.write(EEPROM_GALA, gala);
   return EEPROM.write(EEPROM_CR4, EEPROM_CRC);
 }

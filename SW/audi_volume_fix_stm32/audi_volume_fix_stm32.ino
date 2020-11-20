@@ -128,7 +128,8 @@ volatile uint8_t mute = 0;
 
 volatile uint8_t _gala = 3;
 
-volatile uint16_t captime; // timer count of low pulse (temp)
+volatile uint32_t captime; // timer count of low pulse (temp)
+volatile uint16_t captime_count=1000;
 
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
@@ -295,7 +296,15 @@ void galaRising(void) {
 void galaFalling(void) {
   Timer2.pause();
   //detachInterrupt(digitalPinToInterrupt(GALA));
-  captime = Timer2.getCount();
+  captime += Timer2.getCount();
+  Timer2.setCount(0);
+  captime_count--;
+  if (captime_count == 0){
+    captime = captime/1000;
+    current_speed = 500000 / captime; //was: 1000000 / (2* captime)
+    captime_count=1000;
+  } 
+
 }
 
 void setup ()
@@ -488,8 +497,7 @@ void loop()
     }
     //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
   }
-  if (getGalaEeprom() && captime > 0) {//gala or captime is not 0
-    current_speed = 1000000 / (2 * captime);
+  if (getGalaEeprom() && current_speed > 0) {//gala or captime is not 0
     if (previous_speed != current_speed) {
       //goig up
       uint16_t galaStartSpeed = getGalaStartSpeed();
@@ -605,8 +613,7 @@ void loop()
       }
     }
     previous_speed = current_speed;
-    Timer2.setCount(0);
-    captime = 0;
+    current_speed=0;
     attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING); //
   }
 }

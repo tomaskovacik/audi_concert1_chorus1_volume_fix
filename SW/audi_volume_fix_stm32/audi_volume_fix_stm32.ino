@@ -1,6 +1,7 @@
-// - master
+// - master for HW v1, v2, v3 (with #define HWV3), v4 (with #define HWV4)
 //#include <Wire.h>
 
+#define HWV3
 //#define HWV4
 
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
@@ -40,9 +41,13 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 //#define displayRESET 8
 //STM32
 #define mcuCLK PB3 //CLK
-#define mcuSTATUS PA15 //STATUS/CS
 #define mcuDATA PB4//DATA
-#ifdef HWV4
+#ifdef HWV3
+#define mcuSTATUS PA4 //STATUS/CS
+#else
+#define mcuSTATUS PA15 //STATUS/CS
+#endif
+#if defined(HWV4) || defined(HWV3) 
 #define displayRESET PB8
 #else
 #define displayRESET PB5

@@ -114,7 +114,7 @@ volatile uint8_t drdp = 0; //display read data pointer for front panel comunicat
 volatile uint8_t start_volume = 0x4E;//was 0x82; //based on gala investigation start volume is 0x4E
 
 volatile uint8_t volume = start_volume; //set start volume here ...
-volatile uint8_t current_volume = start_volume; //set start volume here ..
+volatile uint8_t current_volume = 0xFF; //set start volume here ..
 volatile uint8_t saved_volume = start_volume; //set start volume here .. 0xFF to be sure, not fucked up repro ......
 
 volatile uint8_t start_loudness = 0x0E;

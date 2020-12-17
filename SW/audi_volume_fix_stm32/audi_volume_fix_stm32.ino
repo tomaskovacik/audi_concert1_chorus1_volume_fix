@@ -341,6 +341,7 @@ void setup ()
   pinMode(mcuCLK, INPUT_PULLUP);
   pinMode(mcuDATA, INPUT_PULLUP);
   pinMode(displayRESET, INPUT);
+  displayRESETstate = digitalRead(displayRESET);
   //init interrupt on STATUS line to grab data send betwen display and main CPU
   pinMode(GALA, INPUT_PULLUP);
   //serial for debug

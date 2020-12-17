@@ -374,13 +374,13 @@ void loop()
   if (Serial.available()) {
     char serial_char = Serial.read();
     switch (serial_char) {
-      case 'D':
-      case 'd':
+      /*case 'D':
+        case 'd':
         {
           dumpI2cDataAndDoNotFix = !dumpI2cDataAndDoNotFix;
           printInfo();
         }
-        break;
+        break;*/
       case 'h':
       case 'H':
       case '?':

@@ -403,7 +403,6 @@ void loop()
   if (!digitalRead(displayRESET) && displayRESETstate) {
     Serial.println("Reset LOW");
     displayRESETstate = 0;
-    wdp = rdp = dwdp = drdp = 0;
   }
   if (!grabing_SPI) { //no data are send on SPI line
     while (drdp != dwdp) { //reading and writing pointers are not in sync, we have some data which should be analyzed

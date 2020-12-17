@@ -462,6 +462,7 @@ void loop()
           if ((_data[2] & B00000001)) {
             //2 8 81
             //Serial.printlnTimer2.setPolarity(TIMER_CH2, 1);(F("Muting")); dump_i2c_data(_data);
+            sendI2C(_data);//but send mute  command out anyway
             if (!mute) { //we are not already muted
               mute = 1; //set mute flag
               saved_volume = current_volume;//save current volume
@@ -471,7 +472,6 @@ void loop()
               send_loudness();
               delay(5);//to be sure? should check this on scope,
             }
-            sendI2C(_data);//but send mute  command out anyway
           } else { //if it's not 1 then it's zero :)
             //2 8 80
             //Serial.println(F("Unmuting")); dump_i2c_data(_data);

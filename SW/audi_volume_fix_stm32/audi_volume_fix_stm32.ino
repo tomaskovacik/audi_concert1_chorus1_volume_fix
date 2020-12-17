@@ -129,7 +129,7 @@ volatile uint8_t mute = 0;
 volatile uint8_t _gala = 3;
 
 volatile uint32_t captime; // timer count of low pulse (temp)
-volatile uint16_t captime_count=1000;
+volatile uint16_t captime_count = 1000;
 
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
@@ -303,12 +303,12 @@ void galaFalling(void) {
   captime += Timer2.getCount();
   Timer2.setCount(0);
   captime_count--;
-  if (captime_count == 0){
-    captime = captime/1000;
+  if (captime_count == 0) {
+    captime = captime / 1000;
     current_speed = 500000 / captime; //was: 1000000 / (2* captime)
-    captime_count=1000;
-    captime=0;
-  } 
+    captime_count = 1000;
+    captime = 0;
+  }
 
 }
 
@@ -456,6 +456,7 @@ void loop()
         if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {//volume was set by panel, and is probably fucked :) , only fixing volume packet, subbaddress = ?
           Serial.println(F("volume or loudness IGNORING!"));
           //send_volume();
+          //send_loudness();
         } else if (_data[1] == 8 ) { //MUTE
           Serial.println(F("MUTE "));
           if ((_data[2] & B00000001)) {
@@ -618,7 +619,7 @@ void loop()
       }
     }
     previous_speed = current_speed;
-    current_speed=0;
+    current_speed = 0;
     attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING); //
   }
 }
@@ -985,10 +986,10 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
         //54 41 20 20 20 35 20 20 0 0 0 0 0
         //TEXT: VOL  1->...->5
         //TEXT: SENS LO
-        //TEXT: RM   ON 
-        //TEXT: NAV  1->...->5 
-        //TEXT: TEL  L 
-        //TEXT: TA   1->...->5 
+        //TEXT: RM   ON
+        //TEXT: NAV  1->...->5
+        //TEXT: TEL  L
+        //TEXT: TA   1->...->5
         //TEXT: GALA OFF->1-...->5
         Serial.write(_data[2]);
         Serial.write(_data[3]);

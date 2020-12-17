@@ -455,7 +455,7 @@ void loop()
       //Serial.println();
       if (!dumpI2cDataAndDoNotFix) {
         if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {//volume was set by panel, and is probably fucked :) , only fixing volume packet, subbaddress = ?
-          Serial.println(F("volume or loudness IGNORING!"));
+          //Serial.println(F("volume or loudness IGNORING!"));
           //send_volume();
           //send_loudness();
         } else if (_data[1] == 8 ) { //MUTE

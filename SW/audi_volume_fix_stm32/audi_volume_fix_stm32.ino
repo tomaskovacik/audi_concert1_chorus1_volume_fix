@@ -504,6 +504,7 @@ void loop()
     //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
   }
   if (getGalaEeprom() && current_speed > 0) {//gala or captime is not 0
+    Serial.println("gala kicked in");
     if (previous_speed != current_speed) {
       //goig up
       uint16_t galaStartSpeed = getGalaStartSpeed();

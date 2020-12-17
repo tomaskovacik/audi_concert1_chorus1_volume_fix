@@ -470,7 +470,7 @@ void loop()
               set_loudness();
               send_volume();//set new volume
               send_loudness();
-              delay(5);//to be sure? should check this on scope,
+              //delay(5);//to be sure? should check this on scope,
             }
           } else { //if it's not 1 then it's zero :)
             //2 8 80

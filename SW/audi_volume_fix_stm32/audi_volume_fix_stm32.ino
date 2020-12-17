@@ -397,7 +397,7 @@ void loop()
     displayRESETstate = 1;
     start_volume = setStartVolumeFromEeprom();
     volume = start_volume; //set start volume here ...
-    current_volume = start_volume; //set start volume here ..
+    current_volume = 0xFF; //set start volume here ..
     saved_volume = start_volume;
   }
   if (!digitalRead(displayRESET) && displayRESETstate) {

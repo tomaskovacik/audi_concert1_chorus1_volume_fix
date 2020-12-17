@@ -358,7 +358,7 @@ void setup ()
 
 void printInfo() {
   Serial.print(F("Firmware version: "));
-  Serial.println(F("1.0-30.12.19"));
+  Serial.println(F("GALAbranch-16.12.2020"));
   Serial.println(F("(C) kovo, GPL3"));
   Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
   Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));

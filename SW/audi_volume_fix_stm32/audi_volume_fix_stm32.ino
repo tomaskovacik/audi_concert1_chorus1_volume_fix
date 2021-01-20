@@ -44,12 +44,15 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define mcuDATA PB4//DATA
 #ifdef HWV3
 #define mcuSTATUS PA4 //STATUS/CS
+#define VERSION "1.0-30.12.19-HWv3"
 #else
 #define mcuSTATUS PA15 //STATUS/CS
+#define VERSION "1.0-30.12.19-HWv4"
 #endif
 #if defined(HWV4) || defined(HWV3) 
 #define displayRESET PB8
 #else
+#define VERSION "1.0-30.12.19"
 #define displayRESET PB5
 #endif
 
@@ -216,7 +219,7 @@ void setup ()
 
 void printInfo(){
       Serial.print(F("Firmware version: "));
-      Serial.println(F("1.0-30.12.19"));
+      Serial.println(F(VERSION));
       Serial.println(F("(C) kovo, GPL3"));
       Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
       Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));

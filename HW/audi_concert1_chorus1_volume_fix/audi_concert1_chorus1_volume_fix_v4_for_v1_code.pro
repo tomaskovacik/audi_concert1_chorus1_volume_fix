@@ -1,4 +1,4 @@
-update=St 16. september 2020, 12:39:16 CEST
+update=Št  3. jún 2021, 11:58:17 CEST
 version=1
 last_client=kicad
 [general]
@@ -13,7 +13,7 @@ version=1
 LibDir=
 [eeschema/libraries]
 [sheetnames]
-1=cd7a3180-b46f-4744-9b84-f3e941c23908:
+1=0d797dcf-0ec6-4e31-84aa-08f307b73634:
 [pcbnew]
 version=1
 PageLayoutDescrFile=

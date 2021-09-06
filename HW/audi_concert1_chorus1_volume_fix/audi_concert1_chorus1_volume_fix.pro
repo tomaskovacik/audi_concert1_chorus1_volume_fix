@@ -1,4 +1,4 @@
-update=St 28. júl 2021, 21:05:13 CEST
+update=Po  6. september 2021, 21:21:08 CEST
 version=1
 last_client=kicad
 [general]
@@ -40,6 +40,8 @@ ERC_CheckBusToBusConflicts=1
 ERC_CheckBusToNetConflicts=1
 [ModEditFrame]
 version=1
+[sheetnames]
+1=467a7a45-1a26-4599-b129-bcb0c8a3c2a9:
 [pcbnew]
 version=1
 PageLayoutDescrFile=
@@ -375,5 +377,3 @@ uViaDrill=0.1
 dPairWidth=0.2
 dPairGap=0.25
 dPairViaGap=0.25
-[sheetnames]
-1=467a7a45-1a26-4599-b129-bcb0c8a3c2a9:

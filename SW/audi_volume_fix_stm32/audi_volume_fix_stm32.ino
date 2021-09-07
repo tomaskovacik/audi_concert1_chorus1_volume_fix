@@ -304,12 +304,12 @@ void galaFalling(void) {
   Timer2.setCount(0);
   captime_count--;
   if (captime_count == 0) {
-    captime = captime / 1000;
+    captime = captime / 10;
     current_speed = 500000 / captime; //was: 1000000 / (2* captime)
-    captime_count = 1000;
+    captime_count = 10;
     captime = 0;
   }
-
+  attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING);
 }
 
 void setup ()
@@ -349,7 +349,7 @@ void setup ()
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
   //        Serial.println(F("I2C init failed");
-
+  Timer2.pause();
   Timer2.setPrescaleFactor(72); // 1 microsecond resolution
   Timer2.refresh();
   Timer2.setCount(0);

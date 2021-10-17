@@ -1,4 +1,5 @@
 // - master for HW v1, v2, v3 (with #define HWV3), v4 (with #define HWV4)
+// 1.0-17.10.21 - disable dumping data, 24mA consuption, with simple yield() hack ... more investigation is required
 //#include <Wire.h>
 
 #define HWV3
@@ -44,15 +45,15 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define mcuDATA PB4//DATA
 #ifdef HWV3
 #define mcuSTATUS PA4 //STATUS/CS
-#define VERSION "1.0-30.12.19-HWv3"
+#define VERSION "1.0-17.10.21-HWv3"
 #else
 #define mcuSTATUS PA15 //STATUS/CS
-#define VERSION "1.0-30.12.19-HWv4"
+#define VERSION "1.0-17.10.21-HWv4"
 #endif
 #if defined(HWV4) || defined(HWV3) 
 #define displayRESET PB8
 #else
-#define VERSION "1.0-30.12.19"
+#define VERSION "1.0-17.10.21"
 #define displayRESET PB5
 #endif
 
@@ -113,7 +114,7 @@ uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
 uint8_t displayRESETstate = 0;
-uint8_t dumpI2cDataAndDoNotFix = 0;
+//uint8_t dumpI2cDataAndDoNotFix = 0;
 /*
    functions
 */
@@ -223,7 +224,7 @@ void printInfo(){
       if(USE_SERIAL) Serial.println(F("(C) kovo, GPL3"));
       if(USE_SERIAL) Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
       if(USE_SERIAL) Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
-      if(USE_SERIAL) Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
+      //if(USE_SERIAL) Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
 }
 
 void yield(void) { asm("wfe");}
@@ -235,12 +236,12 @@ void loop()
     char serial_char = Serial.read();
     switch (serial_char){
       case 'D':
-      case 'd':
-      {
-        dumpI2cDataAndDoNotFix = !dumpI2cDataAndDoNotFix;
-        printInfo();
-      }
-      break;
+//      case 'd':
+//      {
+//        dumpI2cDataAndDoNotFix = !dumpI2cDataAndDoNotFix;
+//        printInfo();
+//      }
+//      break;
       case 'h':
       case 'H':
       case '?':
@@ -277,7 +278,7 @@ void loop()
       if (_data[0] == 0x25)//button push
       {
         decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
-        if (!dumpI2cDataAndDoNotFix) {
+        //if (!dumpI2cDataAndDoNotFix) {
           if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1]== PANEL_REMOTE_VOLUME_UP)) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
             set_volume_up();
             set_volume();
@@ -286,7 +287,7 @@ void loop()
             set_volume_down();
             set_volume();
           }
-        }
+        //}
       }
       if (_data[0] == 0x9A) { // packet starting with 0x95 is update for pannel, text, indications leds ....
         decode_display_data(_data);
@@ -308,7 +309,7 @@ void loop()
         //if(USE_SERIAL) Serial.print(_data[i],HEX); if(USE_SERIAL) Serial.print(" ");
       }
       //if(USE_SERIAL) Serial.println();
-      if (!dumpI2cDataAndDoNotFix) {
+  //    if (!dumpI2cDataAndDoNotFix) {
         if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {//volume was set by panel, and is probably fucked :) , only fixing volume packet, subbaddress = ?
           if(USE_SERIAL) Serial.println(F("volume or loudness IGNORING!"));
           //set_volume();
@@ -340,10 +341,10 @@ void loop()
         } else {
           sendI2C(_data);
         }
-      } else { //dumpI2cDataAndDoNotFix - we are gonna just dump data
-        if(USE_SERIAL) Serial.print(millis()+String(" [")); dump_i2c_data(_data); if(USE_SERIAL) Serial.print(F("] "));
-        sendI2C(_data); 
-      }
+//      } else { //dumpI2cDataAndDoNotFix - we are gonna just dump data
+//        if(USE_SERIAL) Serial.print(millis()+String(" [")); dump_i2c_data(_data); if(USE_SERIAL) Serial.print(F("] "));
+//        sendI2C(_data); 
+//      }
 
 
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {

@@ -13,7 +13,7 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 
 //TwoWire Swire = TwoWire(PB11, PB10);
 
-
+#define USE_SERIAL 0
 /*
     SPI comunication between motorola MC68HC05B32 cpu to front panel ST6280
     basics:
@@ -185,7 +185,6 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]);
 void set_mute();
 void set_unmute();
 
-
 void setup ()
 {
   volume_packet[0] = 0x02;
@@ -211,23 +210,25 @@ void setup ()
   //init interrupt on STATUS line to grab data send betwen display and main CPU
 
   //serial for debug
-  Serial.begin(115200);
+  if(USE_SERIAL) Serial.begin(115200);
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
-  //        Serial.println(F("I2C init failed");
+  //        if(USE_SERIAL) Serial.println(F("I2C init failed");
+  if(USE_SERIAL) Serial.println("setup done");
 }  // end of setup
 
 void printInfo(){
-      Serial.print(F("Firmware version: "));
-      Serial.println(F(VERSION));
-      Serial.println(F("(C) kovo, GPL3"));
-      Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
-      Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
-      Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
+      if(USE_SERIAL) Serial.print(F("Firmware version: "));
+      if(USE_SERIAL) Serial.println(F(VERSION));
+      if(USE_SERIAL) Serial.println(F("(C) kovo, GPL3"));
+      if(USE_SERIAL) Serial.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
+      if(USE_SERIAL) Serial.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
+      if(USE_SERIAL) Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
 }
 
 void loop()
 {
+  if(USE_SERIAL) 
   if (Serial.available()) {
     char serial_char = Serial.read();
     switch (serial_char){
@@ -250,11 +251,11 @@ void loop()
     }
   }
   if (digitalRead(displayRESET) && !displayRESETstate) {
-    Serial.println("Reset HIGH");
+    if(USE_SERIAL) Serial.println("Reset HIGH");
     displayRESETstate = 1;
   }
   if (!digitalRead(displayRESET) && displayRESETstate) {
-    Serial.println("Reset LOW");
+    if(USE_SERIAL) Serial.println("Reset LOW");
     displayRESETstate = 0;
     wdp = rdp = dwdp = drdp = 0;
   }
@@ -266,7 +267,7 @@ void loop()
       uint8_t _data[howmanybytesinpacket];
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
         _data[i] = _msg[drdp][i];
-        //Serial.print(_data[i],HEX);
+        //if(USE_SERIAL) Serial.print(_data[i],HEX);
       }
       if (_data[0] == 0x25)//button push
       {
@@ -295,22 +296,22 @@ void loop()
       //move current reading data from array of packet in separate variable,
       //here should be memcopy, no for ... but... who cares ...
       uint8_t _data[howmanybytesinpacket];
-      //Serial.println(rdp);
-      //Serial.println(wdp);
+      //if(USE_SERIAL) Serial.println(rdp);
+      //if(USE_SERIAL) Serial.println(wdp);
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
         _data[i] = data[rdp][i];
-        //Serial.print(_data[i],HEX); Serial.print(" ");
+        //if(USE_SERIAL) Serial.print(_data[i],HEX); if(USE_SERIAL) Serial.print(" ");
       }
-      //Serial.println();
+      //if(USE_SERIAL) Serial.println();
       if (!dumpI2cDataAndDoNotFix) {
         if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {//volume was set by panel, and is probably fucked :) , only fixing volume packet, subbaddress = ?
-          Serial.println(F("volume or loudness IGNORING!"));
+          if(USE_SERIAL) Serial.println(F("volume or loudness IGNORING!"));
           //set_volume();
         } else if (_data[1] == 8 ) { //MUTE
-          Serial.println(F("MUTE "));
+          if(USE_SERIAL) Serial.println(F("MUTE "));
           if ((_data[2] & B00000001)) {
             //2 8 81
-            //Serial.println(F("Muting")); dump_i2c_data(_data);
+            //if(USE_SERIAL) Serial.println(F("Muting")); dump_i2c_data(_data);
             if (!mute) { //we are not already muted
               mute = 1; //set mute flag
               saved_volume = current_volume;//save current volume
@@ -321,7 +322,7 @@ void loop()
             sendI2C(_data);//but send mute  command out anyway
           } else { //if it's not 1 then it's zero :)
             //2 8 80
-            //Serial.println(F("Unmuting")); dump_i2c_data(_data);
+            //if(USE_SERIAL) Serial.println(F("Unmuting")); dump_i2c_data(_data);
 
             if (mute) { //only unmute, if we are not unmuted already
               mute = 0; //clear mute flag
@@ -335,7 +336,7 @@ void loop()
           sendI2C(_data);
         }
       } else { //dumpI2cDataAndDoNotFix - we are gonna just dump data
-        Serial.print(millis()+String(" [")); dump_i2c_data(_data); Serial.print(F("] "));
+        if(USE_SERIAL) Serial.print(millis()+String(" [")); dump_i2c_data(_data); if(USE_SERIAL) Serial.print(F("] "));
         sendI2C(_data); 
       }
 
@@ -346,7 +347,7 @@ void loop()
       rdp++;
       if (rdp == howmanypackets) rdp = 0;
     }
-    //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
+    //      if(USE_SERIAL) Serial.print(F("wdp: "); if(USE_SERIAL) Serial.print(wdp); if(USE_SERIAL) Serial.print(F(" rdp "); if(USE_SERIAL) Serial.println(rdp);
   }
 }
 
@@ -506,12 +507,12 @@ void set_volume_down() {
 */
 void set_volume() {
   while (volume != current_volume) { //need to fix volume
-    //    Serial.println("=================== before fix ====================");
-    //    Serial.print("current volume: "); Serial.println(current_volume, HEX);
-    //    Serial.print("volume: "); Serial.println(volume, HEX);
-    //    Serial.print("saved volume: "); Serial.println(saved_volume, HEX);
-    //    Serial.println("====================================================");
-    //Serial.print(F("fixing volume from ")); Serial.print(current_volume, HEX); Serial.print(F(" to ")); Serial.println(volume, HEX);
+    //    if(USE_SERIAL) Serial.println("=================== before fix ====================");
+    //    if(USE_SERIAL) Serial.print("current volume: "); if(USE_SERIAL) Serial.println(current_volume, HEX);
+    //    if(USE_SERIAL) Serial.print("volume: "); if(USE_SERIAL) Serial.println(volume, HEX);
+    //    if(USE_SERIAL) Serial.print("saved volume: "); if(USE_SERIAL) Serial.println(saved_volume, HEX);
+    //    if(USE_SERIAL) Serial.println("====================================================");
+    //if(USE_SERIAL) Serial.print(F("fixing volume from ")); if(USE_SERIAL) Serial.print(current_volume, HEX); if(USE_SERIAL) Serial.print(F(" to ")); if(USE_SERIAL) Serial.println(volume, HEX);
     if (current_volume > volume ) { //current volume is more then volume , so we are turning volume up, step is 2
       if ((current_volume - volume) == 1) current_volume = volume;
       else current_volume = current_volume - 2;
@@ -529,15 +530,15 @@ void set_volume() {
 
     delay(1);
 
-    //    Serial.println("=================== after fix ====================");
-    //    Serial.print("current volume: "); Serial.println(current_volume, HEX);
-    //    Serial.print("volume: "); Serial.println(volume, HEX);
-    //    Serial.print("saved volume: "); Serial.println(saved_volume, HEX);
-    //    Serial.print("current loudness: "); Serial.println(current_loudness, HEX);
-    //    Serial.print("Loudness: "); Serial.println(loudness, HEX);
-    //    if (mute) Serial.println("Muted");
-    //    else Serial.println("Unmuted");
-    //    Serial.println("====================================================");
+    //    if(USE_SERIAL) Serial.println("=================== after fix ====================");
+    //    if(USE_SERIAL) Serial.print("current volume: "); if(USE_SERIAL) Serial.println(current_volume, HEX);
+    //    if(USE_SERIAL) Serial.print("volume: "); if(USE_SERIAL) Serial.println(volume, HEX);
+    //    if(USE_SERIAL) Serial.print("saved volume: "); if(USE_SERIAL) Serial.println(saved_volume, HEX);
+    //    if(USE_SERIAL) Serial.print("current loudness: "); if(USE_SERIAL) Serial.println(current_loudness, HEX);
+    //    if(USE_SERIAL) Serial.print("Loudness: "); if(USE_SERIAL) Serial.println(loudness, HEX);
+    //    if (mute) if(USE_SERIAL) Serial.println("Muted");
+    //    else if(USE_SERIAL) Serial.println("Unmuted");
+    //    if(USE_SERIAL) Serial.println("====================================================");
   }
 
   if (volume == 0xFF) set_mute();
@@ -566,7 +567,7 @@ void set_loudness()
     loudness = 0x06;
   }
   while (current_loudness != loudness) { //need to hack this, cose loudness is set while volume is changed
-    //Serial.print(F("fixing loudness from ")); Serial.print(current_loudness, HEX); Serial.print(F(" to ")); Serial.println(loudness, HEX);
+    //if(USE_SERIAL) Serial.print(F("fixing loudness from ")); if(USE_SERIAL) Serial.print(current_loudness, HEX); if(USE_SERIAL) Serial.print(F(" to ")); if(USE_SERIAL) Serial.println(loudness, HEX);
     //loudness is changed in increments of 1 so
     if (current_loudness < loudness) {
       loudness_packet[2] = ++current_loudness;
@@ -581,14 +582,14 @@ void set_loudness()
 
 void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
 
-  Serial.print(F("unknown display data: "));
+  if(USE_SERIAL) Serial.print(F("unknown display data: "));
   // }
   for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
-    Serial.print(_data[i], HEX);
-    Serial.print(F(" "));
-    //    Serial.write(_data[i]);
+    if(USE_SERIAL) Serial.print(_data[i], HEX);
+    if(USE_SERIAL) Serial.print(F(" "));
+    //    if(USE_SERIAL) Serial.write(_data[i]);
   }
-  Serial.println();
+  if(USE_SERIAL) Serial.println();
 }
 
 /*
@@ -626,7 +627,7 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
 */
 
 void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
-  //  if(_data[1] == 0x13) Serial.println(_data[2],BIN); //debug
+  //  if(_data[1] == 0x13) if(USE_SERIAL) Serial.println(_data[2],BIN); //debug
   uint8_t dump = 0;
   grab_volume = 1;
   switch (_data[1]) { //switching second byte, which indicate type of packet data
@@ -635,39 +636,39 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       //leds: whole packet: 9A 13 2E 0 29 0 0 0 0 0 0 0 0 0 0
       {
         grab_volume = 1;
-        //Serial.println(_data[2],BIN);
-        if (_data[2] & B00000001) Serial.print(F("REG ")); //REG bit
-        if (_data[2] & B00000010) Serial.print(F("RDS ")); //RDS bit
-        if (_data[2] & B00000100) Serial.print(F("AS ")); //AS bit
+        //if(USE_SERIAL) Serial.println(_data[2],BIN);
+        if (_data[2] & B00000001) if(USE_SERIAL) Serial.print(F("REG ")); //REG bit
+        if (_data[2] & B00000010) if(USE_SERIAL) Serial.print(F("RDS ")); //RDS bit
+        if (_data[2] & B00000100) if(USE_SERIAL) Serial.print(F("AS ")); //AS bit
         if (_data[2] & B00001000) {
-          if (_data[2] & B01000000) Serial.print(F("FM1 ")); //FM + 1 bit
-          if (_data[2] & B00100000) Serial.print(F("FM2 ")); //FM + 2 bit
-          if (_data[2] & B00010000) Serial.print(F("AM ")); //FM+|=AM bit
+          if (_data[2] & B01000000) if(USE_SERIAL) Serial.print(F("FM1 ")); //FM + 1 bit
+          if (_data[2] & B00100000) if(USE_SERIAL) Serial.print(F("FM2 ")); //FM + 2 bit
+          if (_data[2] & B00010000) if(USE_SERIAL) Serial.print(F("AM ")); //FM+|=AM bit
         }
-        Serial.println();
-        Serial.print(F("Memory: ")); Serial.println(_data[3] & B00000011); //Memory
+        if(USE_SERIAL) Serial.println();
+        if(USE_SERIAL) Serial.print(F("Memory: ")); if(USE_SERIAL) Serial.println(_data[3] & B00000011); //Memory
 
 
-        Serial.println();
-        Serial.println(F("LEDS: "));
+        if(USE_SERIAL) Serial.println();
+        if(USE_SERIAL) Serial.println(F("LEDS: "));
         //this are in data[2]
-        if (_data[3] & B00001000) Serial.print(F("CPS ")); //CPS
-        if (_data[3] & B00100000) Serial.print(F("Dolby ")); //Dolby
-        if (_data[3] & B00010000) Serial.print(F("RD ")); //RD
+        if (_data[3] & B00001000) if(USE_SERIAL) Serial.print(F("CPS ")); //CPS
+        if (_data[3] & B00100000) if(USE_SERIAL) Serial.print(F("Dolby ")); //Dolby
+        if (_data[3] & B00010000) if(USE_SERIAL) Serial.print(F("RD ")); //RD
         //other in data[4]
-        if (_data[4] & B00000001) Serial.print(F("RDS "));
-        if (_data[4] & B00000010) Serial.print(F("AM "));
-        if (_data[4] & B00000100) Serial.print(F("TP "));
-        if (_data[4] & B00001000) Serial.print(F("FM "));
-        if (_data[4] & B00010000) Serial.print(F("SCAN "));
-        if (_data[4] & B00100000) Serial.print(F("AS "));
-        if (_data[4] & B01000000) Serial.print(F("MODE "));
-        Serial.println();
+        if (_data[4] & B00000001) if(USE_SERIAL) Serial.print(F("RDS "));
+        if (_data[4] & B00000010) if(USE_SERIAL) Serial.print(F("AM "));
+        if (_data[4] & B00000100) if(USE_SERIAL) Serial.print(F("TP "));
+        if (_data[4] & B00001000) if(USE_SERIAL) Serial.print(F("FM "));
+        if (_data[4] & B00010000) if(USE_SERIAL) Serial.print(F("SCAN "));
+        if (_data[4] & B00100000) if(USE_SERIAL) Serial.print(F("AS "));
+        if (_data[4] & B01000000) if(USE_SERIAL) Serial.print(F("MODE "));
+        if(USE_SERIAL) Serial.println();
       }
       break;
     case 0x23:
       {
-        Serial.println(F("display clear"));
+        if(USE_SERIAL) Serial.println(F("display clear"));
       }
       break;
     case 0x32: //freq?
@@ -676,30 +677,30 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
         if (_data[3] == 0x10) { //AM
           uint16_t freq = 531;
           freq = freq + (_data[2] * 9);
-          Serial.print(F("freq: "));
-          Serial.print(freq);
-          Serial.println(F(" kHz (AM)"));
+          if(USE_SERIAL) Serial.print(F("freq: "));
+          if(USE_SERIAL) Serial.print(freq);
+          if(USE_SERIAL) Serial.println(F(" kHz (AM)"));
         } else { //FM
           float freq = 875;
           freq = freq + _data[2];
-          Serial.print(F("freq: "));
-          Serial.print(freq / 10, 1);
-          Serial.println(F(" Mhz (FM)"));
+          if(USE_SERIAL) Serial.print(F("freq: "));
+          if(USE_SERIAL) Serial.print(freq / 10, 1);
+          if(USE_SERIAL) Serial.println(F(" Mhz (FM)"));
         }
       }
       break;
     case 0x48:
       {
         grab_volume = 1;
-        Serial.print(F("display data ASCI: "));
+        if(USE_SERIAL) Serial.print(F("display data ASCI: "));
         // }
         for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
-          Serial.write(_data[i]);
+          if(USE_SERIAL) Serial.write(_data[i]);
           //debug
-          //Serial.print(F(" ");
-          //Serial.write(_data[i]);
+          //if(USE_SERIAL) Serial.print(F(" ");
+          //if(USE_SERIAL) Serial.write(_data[i]);
         }
-        Serial.println();
+        if(USE_SERIAL) Serial.println();
       }
       break;
     case 0x58:
@@ -713,15 +714,15 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
         //TEXT: TEL  L 
         //TEXT: TA   1->...->5 
         //TEXT: GALA OFF->1-...->5
-        Serial.write(_data[2]);
-        Serial.write(_data[3]);
-        Serial.write(_data[4]);
-        Serial.write(_data[5]);
-        Serial.write(_data[6]);
-        Serial.write(_data[7]);
-        Serial.write(_data[8]);
-        Serial.write(_data[9]);
-        Serial.println();
+        if(USE_SERIAL) Serial.write(_data[2]);
+        if(USE_SERIAL) Serial.write(_data[3]);
+        if(USE_SERIAL) Serial.write(_data[4]);
+        if(USE_SERIAL) Serial.write(_data[5]);
+        if(USE_SERIAL) Serial.write(_data[6]);
+        if(USE_SERIAL) Serial.write(_data[7]);
+        if(USE_SERIAL) Serial.write(_data[8]);
+        if(USE_SERIAL) Serial.write(_data[9]);
+        if(USE_SERIAL) Serial.println();
       }
       break;
     case 0x61:
@@ -729,36 +730,36 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
         grab_volume = 1;
         switch (_data[2]) {
           case 0x01:
-            Serial.println(F("TAPE: /\\"));
+            if(USE_SERIAL) Serial.println(F("TAPE: /\\"));
             break;
           case 2:
-            Serial.println(F("TAPE: \\/"));
+            if(USE_SERIAL) Serial.println(F("TAPE: \\/"));
             break;
           case 3:
-            Serial.println(F("TAPE:  > (FF)"));
+            if(USE_SERIAL) Serial.println(F("TAPE:  > (FF)"));
             break;
           case 4:
-            Serial.println(F("TAPE:  < (FR)"));
+            if(USE_SERIAL) Serial.println(F("TAPE:  < (FR)"));
             break;
           case 0:
-            Serial.println(F("TAPE: Eject"));
+            if(USE_SERIAL) Serial.println(F("TAPE: Eject"));
             break;
           case 0x10:
-            Serial.println(F("TP-INFO"));
+            if(USE_SERIAL) Serial.println(F("TP-INFO"));
             break;
           case 0x0B:
-            Serial.println(F("SAFE"));
+            if(USE_SERIAL) Serial.println(F("SAFE"));
             break;
           //9A 61 14
           case 0x14:
-            Serial.println(F("DIAG."));
+            if(USE_SERIAL) Serial.println(F("DIAG."));
             break;
           case 0x17:
-            Serial.println(F("??????????"));
+            if(USE_SERIAL) Serial.println(F("??????????"));
             break;
           //BOSE: 9A 61 1A
           case 0x1A:
-            Serial.println("      BOSE      ");
+            if(USE_SERIAL) Serial.println("      BOSE      ");
             break;
           default:
             dump = 1;
@@ -767,101 +768,101 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       break;
     case 0x71:
       {
-        //  Serial.print(F("Stored text::");
+        //  if(USE_SERIAL) Serial.print(F("Stored text::");
         switch (_data[2] >> 4) {
           case 0x00:
             grab_volume = 0;
-            Serial.print(F("BAS "));
+            if(USE_SERIAL) Serial.print(F("BAS "));
             if ((_data[2] & 0x0F) == 0) {
-              Serial.println(0);
+              if(USE_SERIAL) Serial.println(0);
             } else {
-              Serial.print(F("+"));
-              Serial.println((_data[2] & 0x0F), DEC);
+              if(USE_SERIAL) Serial.print(F("+"));
+              if(USE_SERIAL) Serial.println((_data[2] & 0x0F), DEC);
             }
             break;
           case 0x1:
             grab_volume = 0;
-            Serial.print(F("BAS "));
+            if(USE_SERIAL) Serial.print(F("BAS "));
             if ((_data[2] & 0x0F) == 0) {
-              Serial.println(0);
+              if(USE_SERIAL) Serial.println(0);
             } else {
-              Serial.print(F("-"));
-              Serial.println((_data[2] & 0x0F), DEC);
+              if(USE_SERIAL) Serial.print(F("-"));
+              if(USE_SERIAL) Serial.println((_data[2] & 0x0F), DEC);
             }
             break;
           case 0x2:
             grab_volume = 0;
-            Serial.print(F("TRE "));
+            if(USE_SERIAL) Serial.print(F("TRE "));
             if ((_data[2] & 0x0F) == 0) {
-              Serial.println(0);
+              if(USE_SERIAL) Serial.println(0);
             } else {
-              Serial.print(F("+"));
-              Serial.println((_data[2] & 0x0F), DEC);
+              if(USE_SERIAL) Serial.print(F("+"));
+              if(USE_SERIAL) Serial.println((_data[2] & 0x0F), DEC);
             }
             break;
           case 0x3:
             grab_volume = 0;
-            Serial.print(F("TRE "));
+            if(USE_SERIAL) Serial.print(F("TRE "));
             if ((_data[2] & 0x0F) == 0) {
-              Serial.println(0);
+              if(USE_SERIAL) Serial.println(0);
             } else {
-              Serial.print(F("-"));
-              Serial.println((_data[2] & 0x0F), DEC);
+              if(USE_SERIAL) Serial.print(F("-"));
+              if(USE_SERIAL) Serial.println((_data[2] & 0x0F), DEC);
             }
             break;
           case 0x4:
             grab_volume = 0;
-            Serial.print(F("BAL "));
+            if(USE_SERIAL) Serial.print(F("BAL "));
             if ((_data[2] & 0x0F) == 0) {
-              Serial.println(0);
+              if(USE_SERIAL) Serial.println(0);
             } else {
-              Serial.print(F("R"));
-              Serial.println((_data[2] & 0x0F), DEC);
+              if(USE_SERIAL) Serial.print(F("R"));
+              if(USE_SERIAL) Serial.println((_data[2] & 0x0F), DEC);
             }
             break;
           case 0x5:
             grab_volume = 0;
-            Serial.print(F("BAL "));
+            if(USE_SERIAL) Serial.print(F("BAL "));
             if ((_data[2] & 0x0F) == 0) {
-              Serial.println(0);
+              if(USE_SERIAL) Serial.println(0);
             } else {
-              Serial.print(F("L"));
-              Serial.println((_data[2] & 0x0F), DEC);
+              if(USE_SERIAL) Serial.print(F("L"));
+              if(USE_SERIAL) Serial.println((_data[2] & 0x0F), DEC);
             }
             break;
           case 0x6:
             grab_volume = 0;
-            Serial.print(F("FAD "));
+            if(USE_SERIAL) Serial.print(F("FAD "));
             if ((_data[2] & 0x0F) == 0) {
-              Serial.println(0);
+              if(USE_SERIAL) Serial.println(0);
             } else {
-              Serial.print(F("F"));
-              Serial.println((_data[2] & 0x0F), DEC);
+              if(USE_SERIAL) Serial.print(F("F"));
+              if(USE_SERIAL) Serial.println((_data[2] & 0x0F), DEC);
             }
             break;
           case 0x7:
             grab_volume = 0;
-            Serial.print(F("FAD "));
+            if(USE_SERIAL) Serial.print(F("FAD "));
             if ((_data[2] & 0x0F) == 0) {
-              Serial.println(0);
+              if(USE_SERIAL) Serial.println(0);
             } else {
-              Serial.print(F("R"));
-              Serial.println((_data[2] & 0x0F), DEC);
+              if(USE_SERIAL) Serial.print(F("R"));
+              if(USE_SERIAL) Serial.println((_data[2] & 0x0F), DEC);
             }
             break;
           case 0xA:
             grab_volume = 1;
-            Serial.print(F("TP - MEM ")); //A1 is MEM 1?
-            Serial.print((_data[2] & 0x0F), DEC);
+            if(USE_SERIAL) Serial.print(F("TP - MEM ")); //A1 is MEM 1?
+            if(USE_SERIAL) Serial.print((_data[2] & 0x0F), DEC);
             break;
           case 0xB:
             {
               grab_volume = 1;
               //GALA
-              Serial.print("GALA "); //start radio with [2] pressed
+              if(USE_SERIAL) Serial.print("GALA "); //start radio with [2] pressed
 
-              if ((_data[2] & 0x0F) == 1) Serial.println(F("OFF"));
-              if ((_data[2] & 0x0F) == 0) Serial.println(F("ODB"));
+              if ((_data[2] & 0x0F) == 1) if(USE_SERIAL) Serial.println(F("OFF"));
+              if ((_data[2] & 0x0F) == 0) if(USE_SERIAL) Serial.println(F("ODB"));
             }
             break;
           default:
@@ -871,30 +872,30 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       break;
     case 0x80:
       {
-        if (_data[2] == 0x00) Serial.println(F("Shutdown"));
+        if (_data[2] == 0x00) if(USE_SERIAL) Serial.println(F("Shutdown"));
       }
       break;
     case 0x92:
       {
-        Serial.print(F("Entered safe code:"));
-        Serial.print(_data[2], HEX);
-        Serial.println(_data[3], HEX);
-        //Serial.print(_data[4],HEX);
-        //Serial.println(_data[5],HEX);
+        if(USE_SERIAL) Serial.print(F("Entered safe code:"));
+        if(USE_SERIAL) Serial.print(_data[2], HEX);
+        if(USE_SERIAL) Serial.println(_data[3], HEX);
+        //if(USE_SERIAL) Serial.print(_data[4],HEX);
+        //if(USE_SERIAL) Serial.println(_data[5],HEX);
       }
       break;
     case 0xA2:
       {
         grab_volume = 1;
-        Serial.print(F("CD"));
-        Serial.print(_data[2], HEX);
-        Serial.print(F(" TR"));
-        Serial.println(_data[3], HEX);
+        if(USE_SERIAL) Serial.print(F("CD"));
+        if(USE_SERIAL) Serial.print(_data[2], HEX);
+        if(USE_SERIAL) Serial.print(F(" TR"));
+        if(USE_SERIAL) Serial.println(_data[3], HEX);
       }
       break;
     case 0xE1:
       {
-        if (_data[2] == 0xFB) Serial.println(F("Start"));
+        if (_data[2] == 0xFB) if(USE_SERIAL) Serial.println(F("Start"));
       }
       break;
     default:
@@ -940,7 +941,7 @@ void disableInteruptOnCLK()
   _msg[dwdp][dwbp++] = _byte; //move data from tempporary variable to array based on pointer of current packet and current byte in packet
   if (dwbp == howmanybytesinpacket ) { //this can happend, but it must be last byte in packet, otherwise we will rewrite data in packet row
     dwbp = 0;
-    Serial.println(F("dwbp overflow"));//put this out, just to know,
+    if(USE_SERIAL) Serial.println(F("dwbp overflow"));//put this out, just to know,
   }
   //grabing_SPI = 0;//we are safe to manipulate data in main loop, I just move this to enableInteruptOnCLK function to part wich indicate end of packet transfer
   attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING);// enable RISING interupt on STATE line, indicating start of transmition of data
@@ -948,13 +949,13 @@ void disableInteruptOnCLK()
 
 void readCLK()
 {
-  // Serial.println(digitalRead(mcuDATA),DEC);
+  // if(USE_SERIAL) Serial.println(digitalRead(mcuDATA),DEC);
   if (digitalRead(mcuDATA)) {
     // if (DATA_IS_HIGH) {
-    //Serial.print(1);
+    //if(USE_SERIAL) Serial.print(1);
     _byte = (_byte << 1) | 1;
   } else {
-    // Serial.print(0);
+    // if(USE_SERIAL) Serial.print(0);
     _byte = (_byte << 1);
   }
 }
@@ -962,13 +963,13 @@ void readCLK()
 // called by interrupt service routine when incoming data arrives
 void receiveEvent (int howMany)
 {
-  //Serial.print(F("grabing i2c: wdp: ")); Serial.print(wdp);// Serial.print(F(" howmany: "); Serial.println(howMany);
+  //if(USE_SERIAL) Serial.print(F("grabing i2c: wdp: ")); if(USE_SERIAL) Serial.print(wdp);// if(USE_SERIAL) Serial.print(F(" howmany: "); if(USE_SERIAL) Serial.println(howMany);
   reading_i2c = 1;
   data[wdp][0] = howMany;
   for (uint8_t i = 0; i < howMany; i++) {
 
     data[wdp][i + 1] = Wire.read();
-    //Serial.print(data[wdp][i + 1], HEX);
+    //if(USE_SERIAL) Serial.print(data[wdp][i + 1], HEX);
   }
 
   wdp++;
@@ -987,14 +988,14 @@ void sendI2C (uint8_t data[howmanybytesinpacket]) {
   //  }
   //
   //  if (timeout_us <= 0) { // start transfer
-  //    Serial.println(F("I2C device busy");
+  //    if(USE_SERIAL) Serial.println(F("I2C device busy");
   //    return;
   //  }
 
   SWire.beginTransmission(MY_ADDRESS); // transmit to device
 
-  // Serial.print(F("size: ");
-  // Serial.println(data[0]);
+  // if(USE_SERIAL) Serial.print(F("size: ");
+  // if(USE_SERIAL) Serial.println(data[0]);
 
   for (byte i = 0 ; i < data[0]; i++) {
     //i2c_write(data[i + 1]);
@@ -1002,12 +1003,12 @@ void sendI2C (uint8_t data[howmanybytesinpacket]) {
       delay(10);
     }              // sends one byte
 
-    //Serial.print(data[i + 1], HEX);
-    //Serial.print(F(" ");
+    //if(USE_SERIAL) Serial.print(data[i + 1], HEX);
+    //if(USE_SERIAL) Serial.print(F(" ");
   }
   //i2c_stop(); // send stop condition
   SWire.endTransmission();    // stop transmitting
-  //Serial.println();
+  //if(USE_SERIAL) Serial.println();
   // decode_i2c(data);
 }
 
@@ -1023,243 +1024,243 @@ void decode_i2c(uint8_t data[howmanybytesinpacket]) {
   for (uint8_t i = 0; i < increments; i++) {
     uint8_t subaddress = (data[1] & 0xf) + i;//subbadress is always lower 4bits of 2nd field in array plus increment
     uint8_t c = data[i + 2];//0th byte -> size, 1st byte->subaddress
-    //Serial.println(subaddress);
+    //if(USE_SERIAL) Serial.println(subaddress);
     switch (subaddress) {
       case 0:
         { // input selector
 
-          Serial.print(F("Input selector: "));
-          //Serial.print(c,HEX);
-          //Serial.print(F(" ");
+          if(USE_SERIAL) Serial.print(F("Input selector: "));
+          //if(USE_SERIAL) Serial.print(c,HEX);
+          //if(USE_SERIAL) Serial.print(F(" ");
           switch (c & B0000111) {
             case 1:
-              Serial.println(F("TAPE selected (IN2)"));
+              if(USE_SERIAL) Serial.println(F("TAPE selected (IN2)"));
               break;
             case 2:
-              Serial.println(F("FM / AM selected (IN1) "));
+              if(USE_SERIAL) Serial.println(F("FM / AM selected (IN1) "));
               break;
             case 3:
-              Serial.println(F("TP selected (AM mono)"));
+              if(USE_SERIAL) Serial.println(F("TP selected (AM mono)"));
               break;
 
           }
           switch (c & B01000111) {
             case 0:
-              Serial.println(F("CD selected (0dB diferential input gain (IN3))"));
+              if(USE_SERIAL) Serial.println(F("CD selected (0dB diferential input gain (IN3))"));
               break;
             case 40:
-              Serial.println(F("CD selected (-6dB diferential input gain (IN3))"));
+              if(USE_SERIAL) Serial.println(F("CD selected (-6dB diferential input gain (IN3))"));
               break;
 
           }
           switch (c & B00011000) {
             case 0:
-              Serial.println(F("11.25dB gain"));
+              if(USE_SERIAL) Serial.println(F("11.25dB gain"));
               break;
             case 1:
-              Serial.println(F("7.5dB gain"));
+              if(USE_SERIAL) Serial.println(F("7.5dB gain"));
               break;
             case 2:
-              Serial.println(F("3.75dB gain"));
+              if(USE_SERIAL) Serial.println(F("3.75dB gain"));
               break;
             case 3:
-              Serial.println(F("0dB gain"));
+              if(USE_SERIAL) Serial.println(F("0dB gain"));
               break;
           }
         }
         break;
       case 1:
         { // loudness
-          Serial.print(F("Loudness: "));
+          if(USE_SERIAL) Serial.print(F("Loudness: "));
           if (c > 0xf) {
-            Serial.println(F("OFF"));
+            if(USE_SERIAL) Serial.println(F("OFF"));
           } else {
-            Serial.print(F(" - "));
-            Serial.print(((c & 0xF) * 1.25), DEC);
-            Serial.println(F("dB"));
+            if(USE_SERIAL) Serial.print(F(" - "));
+            if(USE_SERIAL) Serial.print(((c & 0xF) * 1.25), DEC);
+            if(USE_SERIAL) Serial.println(F("dB"));
           }
         }
         break;
       case 2:
         { // volume
-          Serial.print(F("volume "));
-          //          Serial.println(c);
+          if(USE_SERIAL) Serial.print(F("volume "));
+          //          if(USE_SERIAL) Serial.println(c);
           float _volume = 0;
-          //          Serial.println((c & B00000011) * (-0.31));
-          //          Serial.println(((c >> 2) & B00000111) * (-1.25));
-          //          Serial.println(20 - (((c >> 5) & B00000111) * 10));
+          //          if(USE_SERIAL) Serial.println((c & B00000011) * (-0.31));
+          //          if(USE_SERIAL) Serial.println(((c >> 2) & B00000111) * (-1.25));
+          //          if(USE_SERIAL) Serial.println(20 - (((c >> 5) & B00000111) * 10));
           _volume = (20 - (((c >> 5) & B00000111) * 10)) + (((c >> 2) & B00000111) * (-1.25)) + ((c & B00000011) * (-0.31));
-          Serial.print(_volume);
-          Serial.print(F("dB"));
-          Serial.print(F(" ( "));
-          Serial.print(c, HEX);
-          Serial.println(F(" )"));
+          if(USE_SERIAL) Serial.print(_volume);
+          if(USE_SERIAL) Serial.print(F("dB"));
+          if(USE_SERIAL) Serial.print(F(" ( "));
+          if(USE_SERIAL) Serial.print(c, HEX);
+          if(USE_SERIAL) Serial.println(F(" )"));
         }
         break;
       case 3: // bass, treble
         {
-          Serial.print(F("Bass: "));
+          if(USE_SERIAL) Serial.print(F("Bass: "));
           //Bass
           switch (c >> 4) {
             case 0:
-              Serial.print(-14);
+              if(USE_SERIAL) Serial.print(-14);
               break;
             case 1:
-              Serial.print(-12);
+              if(USE_SERIAL) Serial.print(-12);
               break;
             case 2:
-              Serial.print(-10);
+              if(USE_SERIAL) Serial.print(-10);
               break;
             case 3:
-              Serial.print(-8);
+              if(USE_SERIAL) Serial.print(-8);
               break;
             case 4:
-              Serial.print(-6);
+              if(USE_SERIAL) Serial.print(-6);
               break;
             case 5:
-              Serial.print(-4);
+              if(USE_SERIAL) Serial.print(-4);
               break;
             case 6:
-              Serial.print(-2);
+              if(USE_SERIAL) Serial.print(-2);
               break;
             case 7:
             case 15:
-              Serial.print(0);
+              if(USE_SERIAL) Serial.print(0);
               break;
             case 8:
-              Serial.print(14);
+              if(USE_SERIAL) Serial.print(14);
               break;
             case 9:
-              Serial.print(12);
+              if(USE_SERIAL) Serial.print(12);
               break;
             case 10:
-              Serial.print(10);
+              if(USE_SERIAL) Serial.print(10);
               break;
             case 11:
-              Serial.print(8);
+              if(USE_SERIAL) Serial.print(8);
               break;
             case 12:
-              Serial.print(6);
+              if(USE_SERIAL) Serial.print(6);
               break;
             case 13:
-              Serial.print(4);
+              if(USE_SERIAL) Serial.print(4);
               break;
             case 14:
-              Serial.print(2);
+              if(USE_SERIAL) Serial.print(2);
               break;
           }
-          Serial.print(F("dB, Treble: "));
+          if(USE_SERIAL) Serial.print(F("dB, Treble: "));
           //treble
           switch (c & 0xF) {
             case 0:
-              Serial.print(18);
+              if(USE_SERIAL) Serial.print(18);
               break;
             case 1:
-              Serial.print(16);
+              if(USE_SERIAL) Serial.print(16);
               break;
             case 2:
-              Serial.print(-10);
+              if(USE_SERIAL) Serial.print(-10);
               break;
             case 3:
-              Serial.print(-8);
+              if(USE_SERIAL) Serial.print(-8);
               break;
             case 4:
-              Serial.print(-6);
+              if(USE_SERIAL) Serial.print(-6);
               break;
             case 5:
-              Serial.print(-4);
+              if(USE_SERIAL) Serial.print(-4);
               break;
             case 6:
-              Serial.print(-2);
+              if(USE_SERIAL) Serial.print(-2);
               break;
             case 7:
             case 15:
-              Serial.print(0);
+              if(USE_SERIAL) Serial.print(0);
               break;
             case 8:
-              Serial.print(14);
+              if(USE_SERIAL) Serial.print(14);
               break;
             case 9:
-              Serial.print(12);
+              if(USE_SERIAL) Serial.print(12);
               break;
             case 10:
-              Serial.print(10);
+              if(USE_SERIAL) Serial.print(10);
               break;
             case 11:
-              Serial.print(8);
+              if(USE_SERIAL) Serial.print(8);
               break;
             case 12:
-              Serial.print(6);
+              if(USE_SERIAL) Serial.print(6);
               break;
             case 13:
-              Serial.print(4);
+              if(USE_SERIAL) Serial.print(4);
               break;
             case 14:
-              Serial.print(2);
+              if(USE_SERIAL) Serial.print(2);
               break;
           }
-          Serial.println(F("dB"));
+          if(USE_SERIAL) Serial.println(F("dB"));
         }
         break;
       case 4: // Speaker Attenuator left front
-        Serial.print(F("Speaker Attenuator left front: "));
+        if(USE_SERIAL) Serial.print(F("Speaker Attenuator left front: "));
         spk_atten(c);
         break;
       case 5: // Speaker Attenuator left rear
-        Serial.print(F("Speaker Attenuator left rear: "));
+        if(USE_SERIAL) Serial.print(F("Speaker Attenuator left rear: "));
         spk_atten(c);
         break;
       case 6: // Speaker Attenuator right front
-        Serial.print(F("Speaker Attenuator right front: "));
+        if(USE_SERIAL) Serial.print(F("Speaker Attenuator right front: "));
         spk_atten(c);
         break;
       case 7: // Speaker Attenuator left rear
-        Serial.print(F("Speaker Attenuator left rear: "));
+        if(USE_SERIAL) Serial.print(F("Speaker Attenuator left rear: "));
         spk_atten(c);
         break;
       case 8: // mute
-        Serial.print(F("Mute: "));
+        if(USE_SERIAL) Serial.print(F("Mute: "));
         //0th and 1st bits
         switch (c & B00000011) {
           case 1:
-            Serial.println(F("Soft Mute with fast slope (I = Imax)"));
+            if(USE_SERIAL) Serial.println(F("Soft Mute with fast slope (I = Imax)"));
             break;
           case 3:
-            Serial.println(F("Soft Mute with slow slope (I = Imin)"));
+            if(USE_SERIAL) Serial.println(F("Soft Mute with slow slope (I = Imin)"));
             break;
         }
         //3th bit
-        if ((c >> 3) & 1) Serial.println(F("Direct Mute"));
+        if ((c >> 3) & 1) if(USE_SERIAL) Serial.println(F("Direct Mute"));
         //2nd and 4th bit
         if (!((c >> 5) & 1)) {
-          Serial.print(F("Zero Crossing Mute "));
+          if(USE_SERIAL) Serial.print(F("Zero Crossing Mute "));
           if ((c >> 2) & 1) {
-            Serial.println(F("On"));
+            if(USE_SERIAL) Serial.println(F("On"));
           } else {
-            Serial.println(F("Off"));
+            if(USE_SERIAL) Serial.println(F("Off"));
           }
         }
         //5th and 6th bit
         switch ((c >> 5) & B00000011) {
           case 0:
-            Serial.println(F("160mV ZC Window Threshold (WIN = 00)"));
+            if(USE_SERIAL) Serial.println(F("160mV ZC Window Threshold (WIN = 00)"));
             break;
           case 1:
-            Serial.println(F("80mV ZC Window Threshold (WIN = 01)"));
+            if(USE_SERIAL) Serial.println(F("80mV ZC Window Threshold (WIN = 01)"));
             break;
           case 2:
-            Serial.println(F("40mV ZC Window Threshold (WIN = 10)"));
+            if(USE_SERIAL) Serial.println(F("40mV ZC Window Threshold (WIN = 10)"));
             break;
           case 3:
-            Serial.println(F("20mV ZC Window Threshold (WIN = 11)"));
+            if(USE_SERIAL) Serial.println(F("20mV ZC Window Threshold (WIN = 11)"));
             break;
         }
         switch ((c >> 7) & B00000011) {
           case 0:
-            Serial.println(F("Nonsymmetrical Bass Cut"));
+            if(USE_SERIAL) Serial.println(F("Nonsymmetrical Bass Cut"));
             break;
           case 1:
-            Serial.println(F("Symmetrical Bass Cut"));
+            if(USE_SERIAL) Serial.println(F("Symmetrical Bass Cut"));
             break;
         }
         break;
@@ -1270,132 +1271,132 @@ void decode_i2c(uint8_t data[howmanybytesinpacket]) {
 void spk_atten(uint8_t c) {
   if ((c & B00011111) == 0x1F)
   {
-    Serial.println(F("Muted"));
+    if(USE_SERIAL) Serial.println(F("Muted"));
   } else {
 
     float low = (c & B00000111) * 1.25;
     uint8_t high = ((c >> 3) & B00000011) * 10;
-    Serial.print(-(low + high));
-    Serial.println(F("dB"));
+    if(USE_SERIAL) Serial.print(-(low + high));
+    if(USE_SERIAL) Serial.println(F("dB"));
   }
 }
 
 void decode_button_push(uint8_t data) {
-  // Serial.print(data,HEX);
+  // if(USE_SERIAL) Serial.print(data,HEX);
   switch (data) {
     case PANEL_1:
-      Serial.println(F(" 1"));
+      if(USE_SERIAL) Serial.println(F(" 1"));
       break;
     case PANEL_2:
-      Serial.println(F(" 2"));
+      if(USE_SERIAL) Serial.println(F(" 2"));
       break;
     case PANEL_3:
-      Serial.println(F(" 3"));
+      if(USE_SERIAL) Serial.println(F(" 3"));
       break;
     case PANEL_4:
-      Serial.println(F(" 4"));
+      if(USE_SERIAL) Serial.println(F(" 4"));
       break;
     case PANEL_5:
-      Serial.println(F(" 5"));
+      if(USE_SERIAL) Serial.println(F(" 5"));
       break;
     case PANEL_6:
-      Serial.println(F(" 6"));
+      if(USE_SERIAL) Serial.println(F(" 6"));
       break;
     case PANEL_SEEK_UP:
-      Serial.println(F(" Seek > "));
+      if(USE_SERIAL) Serial.println(F(" Seek > "));
       break;
     case PANEL_TP:
-      Serial.println(F(" TP"));
+      if(USE_SERIAL) Serial.println(F(" TP"));
       break;
     case PANEL_RDS:
-      Serial.println(F(" RDS"));
+      if(USE_SERIAL) Serial.println(F(" RDS"));
       break;
     case PANEL_CPS:
-      Serial.println(F(" CPS"));
+      if(USE_SERIAL) Serial.println(F(" CPS"));
       break;
     case PANEL_MODE:
-      Serial.println(F(" MODE"));
+      if(USE_SERIAL) Serial.println(F(" MODE"));
       break;
     case PANEL_RD:
-      Serial.println(F(" RD(random ? )"));
+      if(USE_SERIAL) Serial.println(F(" RD(random ? )"));
       break;
     case PANEL_PREVIOUS_TRACK:
-      Serial.println(F(" << "));
+      if(USE_SERIAL) Serial.println(F(" << "));
       break;
     case PANEL_FADE:
-      Serial.println(F(" FAD"));
+      if(USE_SERIAL) Serial.println(F(" FAD"));
       break;
     case PANEL_BALANCE:
-      Serial.println(F(" BALANCE"));
+      if(USE_SERIAL) Serial.println(F(" BALANCE"));
       break;
     case PANEL_BASS:
-      Serial.println(F(" BASS"));
+      if(USE_SERIAL) Serial.println(F(" BASS"));
       break;
     case PANEL_AM:
-      Serial.println(F(" AM"));
+      if(USE_SERIAL) Serial.println(F(" AM"));
       break;
     case PANEL_DOLBY:
-      Serial.println(F(" Dolby"));
+      if(USE_SERIAL) Serial.println(F(" Dolby"));
       break;
     case PANEL_NEXT_TRACK:
-      Serial.println(F(" >>"));
+      if(USE_SERIAL) Serial.println(F(" >>"));
       break;
     case PANEL_TREBLE:
-      Serial.println(F(" TREB"));
+      if(USE_SERIAL) Serial.println(F(" TREB"));
       break;
     case PANEL_AS:
-      Serial.println(F(" AS"));
+      if(USE_SERIAL) Serial.println(F(" AS"));
       break;
     case PANEL_SCAN:
-      Serial.println(F(" SCAN"));
+      if(USE_SERIAL) Serial.println(F(" SCAN"));
       break;
     case PANEL_FM:
-      Serial.println(F(" FM"));
+      if(USE_SERIAL) Serial.println(F(" FM"));
       break;
     case PANEL_SEEK_DOWN:
-      Serial.println(F(" Seek < "));
+      if(USE_SERIAL) Serial.println(F(" Seek < "));
       break;
     case PANEL_REVERSE:
-      Serial.println(F(" REV"));
+      if(USE_SERIAL) Serial.println(F(" REV"));
       break;
     case PANEL_KNOB_UP:
-      Serial.println(F(" Knob + "));
+      if(USE_SERIAL) Serial.println(F(" Knob + "));
       break;
     case PANEL_KNOB_DOWN:
-      Serial.println(F(" Knob - "));
+      if(USE_SERIAL) Serial.println(F(" Knob - "));
       break;
     case PANEL_CODE_IN:
-      Serial.println(F(" Code in (TP + RDS)"));
+      if(USE_SERIAL) Serial.println(F(" Code in (TP + RDS)"));
       break;
     case PANEL_EJECT:
-      Serial.println(F("eject"));
+      if(USE_SERIAL) Serial.println(F("eject"));
       break;
     case PANEL_BUTTON_RELEASE:
-      Serial.println(F("button release"));
+      if(USE_SERIAL) Serial.println(F("button release"));
       break;
     case PANEL_REMOTE_VOLUME_UP:
-      Serial.println(F("Remote volume up"));
+      if(USE_SERIAL) Serial.println(F("Remote volume up"));
       break;
 case PANEL_REMOTE_VOLUME_DOWN:
-      Serial.println(F("Remote volume down"));
+      if(USE_SERIAL) Serial.println(F("Remote volume down"));
       break;
 case PANEL_REMOTE_RIGHT:
-      Serial.println(F("Remote right"));
+      if(USE_SERIAL) Serial.println(F("Remote right"));
       break;
 case PANEL_REMOTE_LEFT:
-      Serial.println(F("Remote left"));
+      if(USE_SERIAL) Serial.println(F("Remote left"));
       break;
 case PANEL_REMOTE_UP:
-      Serial.println(F("Remote up"));
+      if(USE_SERIAL) Serial.println(F("Remote up"));
       break;
 case PANEL_REMOTE_DOWN:
-      Serial.println(F("Remote down"));
+      if(USE_SERIAL) Serial.println(F("Remote down"));
       break;
 case PANEL_START:
-      Serial.println(F("Panel start"));
+      if(USE_SERIAL) Serial.println(F("Panel start"));
       break;
     default:
-      Serial.print(F("Unknown button pushed: ")); Serial.println(data, HEX);
+      if(USE_SERIAL) Serial.print(F("Unknown button pushed: ")); if(USE_SERIAL) Serial.println(data, HEX);
       break;
   }
 }

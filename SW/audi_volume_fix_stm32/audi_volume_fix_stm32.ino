@@ -226,6 +226,8 @@ void printInfo(){
       if(USE_SERIAL) Serial.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
 }
 
+void yield(void) { asm("wfe");}
+
 void loop()
 {
   if(USE_SERIAL) 
@@ -258,6 +260,9 @@ void loop()
     if(USE_SERIAL) Serial.println("Reset LOW");
     displayRESETstate = 0;
     wdp = rdp = dwdp = drdp = 0;
+    while(!digitalRead(displayRESET)){
+      delay(100);
+    }
   }
   if (!grabing_SPI) { //no data are send on SPI line
     while (drdp != dwdp) { //reading and writing pointers are not in sync, we have some data which should be analyzed

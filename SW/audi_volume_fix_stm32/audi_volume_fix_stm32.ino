@@ -225,7 +225,7 @@ uint8_t setStartVolumeFromEeprom(void) {
   return 0x4E;
 }
 
-uint16_t getGalaStartSpeed(void) {
+uint8_t getGalaStartSpeed(void) {
   /*
      GALA = 1 -> 100-(1-1)*15 = 100 -  0 = 100
      GALA = 2 -> 100-(2-1)*15 = 100 - 15 =  85
@@ -235,6 +235,9 @@ uint16_t getGalaStartSpeed(void) {
   */
   return (100 - ((getGalaEeprom() - 1) * 15));
 }
+
+uint8_t galaStartSpeed;
+volatile uint8_t currentGala;
 
 uint8_t getGalaEeprom(void) {
   if (checkEEPROM())
@@ -353,8 +356,11 @@ void setup ()
   Timer2.setPrescaleFactor(72); // 1 microsecond resolution
   Timer2.refresh();
   Timer2.setCount(0);
-  attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING);
-
+  
+  galaStartSpeed = getGalaStartSpeed();
+  currentGala = getGalaEeprom();
+  //if current gala > 0, gala is enabled so lets meassure speed
+  if (currentGala) attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING);
 }
 
 void printInfo() {
@@ -503,18 +509,17 @@ void loop()
     }
     //      Serial.print(F("wdp: "); Serial.print(wdp); Serial.print(F(" rdp "); Serial.println(rdp);
   }
-  if (getGalaEeprom() && current_speed > 0) {//gala or captime is not 0
+  if (current_speed > 0) {//captime is not 0. captime is calculated only if gala is enabled (not = 0)
     Serial.println("gala kicked in");
     if (previous_speed != current_speed) {
-      //goig up
-      uint16_t galaStartSpeed = getGalaStartSpeed();
+      //going up
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
         set_volume_up();
         send_volume();
       }
       galaStartSpeed += 30; //+30
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        loudness--;
+        loudness++;//--;
         send_loudness();
       }
       galaStartSpeed += 30; //+60
@@ -524,7 +529,7 @@ void loop()
       }
       galaStartSpeed += 30; //+90
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        loudness--;
+        loudness++;//--;
         send_loudness();
       }
       galaStartSpeed += 30; //+120
@@ -534,7 +539,7 @@ void loop()
       }
       galaStartSpeed += 30; //+150
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        loudness--;
+        loudness++;//--;
         send_loudness();
       }
       galaStartSpeed += 30; //+180
@@ -544,7 +549,7 @@ void loop()
       }
       galaStartSpeed += 30; //+210
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        loudness--;
+        loudness++;//--;
         send_loudness();
       }
       galaStartSpeed += 30; //+240
@@ -554,7 +559,7 @@ void loop()
       }
       galaStartSpeed += 30; //+270
       if (previous_speed <= galaStartSpeed && galaStartSpeed < current_speed) {
-        loudness--;
+        loudness++;//--;
         send_loudness();
       }
       galaStartSpeed += 30; //+300 //355 max :D :D :D
@@ -570,7 +575,7 @@ void loop()
       }
       galaStartSpeed -= 30; //+270
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        loudness++;
+        loudness--;//++;
         send_loudness();
       }
       galaStartSpeed -= 30; //+240
@@ -580,7 +585,7 @@ void loop()
       }
       galaStartSpeed -= 30; //+210
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        loudness++;
+        loudness--;//++;
         send_loudness();
       }
       galaStartSpeed -= 30; //+180
@@ -590,7 +595,7 @@ void loop()
       }
       galaStartSpeed -= 30; //+150
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        loudness++;
+        loudness--;//++;
         send_loudness();
       }
       galaStartSpeed -= 30; //+120
@@ -600,7 +605,7 @@ void loop()
       }
       galaStartSpeed -= 30; //+90
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        loudness++;
+        loudness--;//++;
         send_loudness();
       }
       galaStartSpeed -= 30; //+60
@@ -610,7 +615,7 @@ void loop()
       }
       galaStartSpeed -= 30; //+30
       if (current_speed < galaStartSpeed && galaStartSpeed <= previous_speed) {
-        loudness++;
+        loudness--;//++;
         send_loudness();
       }
       galaStartSpeed -= 30; //+0
@@ -621,7 +626,6 @@ void loop()
     }
     previous_speed = current_speed;
     current_speed = 0;
-    attachInterrupt(digitalPinToInterrupt(GALA), galaRising, RISING); //
   }
 }
 

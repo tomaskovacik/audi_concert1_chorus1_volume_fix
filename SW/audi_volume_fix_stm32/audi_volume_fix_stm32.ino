@@ -261,7 +261,7 @@ void loop()
     displayRESETstate = 0;
     wdp = rdp = dwdp = drdp = 0;
     while(!digitalRead(displayRESET)){
-      delay(100);
+      delay(1);
     }
   }
   if (!grabing_SPI) { //no data are send on SPI line

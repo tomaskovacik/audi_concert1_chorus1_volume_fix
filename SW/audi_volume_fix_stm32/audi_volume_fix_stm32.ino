@@ -45,15 +45,15 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define mcuDATA PB4//DATA
 #ifdef HWV3
 #define mcuSTATUS PA4 //STATUS/CS
-#define VERSION "1.0-17.10.21-HWv3"
+#define VERSION "1.0-24.10.21-HWv3"
 #else
 #define mcuSTATUS PA15 //STATUS/CS
-#define VERSION "1.0-17.10.21-HWv4"
+#define VERSION "1.0-24.10.21-HWv4"
 #endif
 #if defined(HWV4) || defined(HWV3) 
 #define displayRESET PB8
 #else
-#define VERSION "1.0-17.10.21"
+#define VERSION "1.0-24.10.21"
 #define displayRESET PB5
 #endif
 
@@ -215,7 +215,6 @@ void setup ()
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
   //        if(USE_SERIAL) Serial.println(F("I2C init failed");
-  if(USE_SERIAL) Serial.println("setup done");
 }  // end of setup
 
 void printInfo(){
@@ -262,6 +261,7 @@ void loop()
     displayRESETstate = 0;
     wdp = rdp = dwdp = drdp = 0;
     while(!digitalRead(displayRESET)){
+      //caled for sleep
       delay(1);
     }
   }
@@ -309,7 +309,7 @@ void loop()
         //if(USE_SERIAL) Serial.print(_data[i],HEX); if(USE_SERIAL) Serial.print(" ");
       }
       //if(USE_SERIAL) Serial.println();
-  //    if (!dumpI2cDataAndDoNotFix) {
+     // if (!dumpI2cDataAndDoNotFix) {
         if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {//volume was set by panel, and is probably fucked :) , only fixing volume packet, subbaddress = ?
           if(USE_SERIAL) Serial.println(F("volume or loudness IGNORING!"));
           //set_volume();
@@ -323,7 +323,7 @@ void loop()
               saved_volume = current_volume;//save current volume
               volume = 0xFF; //set volume to be 0xFF (volume full down,off)
               set_volume();//set new volume
-              delay(5);//to be sure? should check this on scope,
+              //test delay(5);//to be sure? should check this on scope,
             }
             sendI2C(_data);//but send mute  command out anyway
           } else { //if it's not 1 then it's zero :)
@@ -341,10 +341,10 @@ void loop()
         } else {
           sendI2C(_data);
         }
-//      } else { //dumpI2cDataAndDoNotFix - we are gonna just dump data
-//        if(USE_SERIAL) Serial.print(millis()+String(" [")); dump_i2c_data(_data); if(USE_SERIAL) Serial.print(F("] "));
-//        sendI2C(_data); 
-//      }
+/*      } else { //dumpI2cDataAndDoNotFix - we are gonna just dump data
+        if(USE_SERIAL) Serial.print(millis()+String(" [")); dump_i2c_data(_data); if(USE_SERIAL) Serial.print(F("] "));
+        sendI2C(_data); 
+      }*/
 
 
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
@@ -534,7 +534,7 @@ void set_volume() {
       sendI2C(volume_packet);
     }
 
-    delay(1);
+    //test delay(1);
 
     //    if(USE_SERIAL) Serial.println("=================== after fix ====================");
     //    if(USE_SERIAL) Serial.print("current volume: "); if(USE_SERIAL) Serial.println(current_volume, HEX);
@@ -582,7 +582,7 @@ void set_loudness()
       loudness_packet[2] = --current_loudness;
     }
     sendI2C(loudness_packet);
-    delay(1);
+    //test delay(1);
   }
 }
 
@@ -1006,7 +1006,7 @@ void sendI2C (uint8_t data[howmanybytesinpacket]) {
   for (byte i = 0 ; i < data[0]; i++) {
     //i2c_write(data[i + 1]);
     while (!SWire.write(data[i + 1])) {
-      delay(10);
+      //test delay(10);
     }              // sends one byte
 
     //if(USE_SERIAL) Serial.print(data[i + 1], HEX);

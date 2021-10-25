@@ -1,0 +1,1 @@
+openocd -f /usr/local/share/openocd/scripts/interface/stlink.cfg -f /usr/local/share/openocd/scripts/target/stm32f1x.cfg -c init -c 'reset halt' -c 'flash write_image erase ./generic_boot20_pc13_fastboot.bin 0x8000000;reset run;exit'

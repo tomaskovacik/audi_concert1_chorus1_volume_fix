@@ -227,8 +227,6 @@ void printInfo(){
       //if(USE_SERIAL) USEDSERIAL.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
 }
 
-void yield(void) { asm("wfe");}
-
 void loop()
 {
   if(USE_SERIAL) 

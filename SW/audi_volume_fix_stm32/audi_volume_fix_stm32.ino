@@ -191,6 +191,7 @@ void set_unmute();
 
 void setup ()
 {
+  //PB3 works inly in this is called
   enableDebugPorts(); //required if not USB upload is used, for example pure STLINK or serial upload - perfect for lowdensity devices (103C6 4exmaple)
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;

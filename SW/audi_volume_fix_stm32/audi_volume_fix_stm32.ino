@@ -15,6 +15,8 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 //TwoWire Swire = TwoWire(PB11, PB10);
 
 #define USE_SERIAL 1
+//use Serial for medium-high density devices like stm32F103C8/B
+//user Serial1 for low densty devices like stm32f103c6
 #define USEDSERIAL Serial
 /*
     SPI comunication between motorola MC68HC05B32 cpu to front panel ST6280

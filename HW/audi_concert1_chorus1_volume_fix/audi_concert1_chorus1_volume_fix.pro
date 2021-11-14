@@ -1,4 +1,4 @@
-update=Po  6. september 2021, 21:21:08 CEST
+update=Ne 14. november 2021, 17:45:48 CET
 version=1
 last_client=kicad
 [general]
@@ -12,8 +12,6 @@ NetIExt=net
 version=1
 LibDir=
 [eeschema/libraries]
-[SchematicFrame]
-version=1
 [LibeditFrame]
 version=1
 [schematic_editor]
@@ -41,7 +39,9 @@ ERC_CheckBusToNetConflicts=1
 [ModEditFrame]
 version=1
 [sheetnames]
-1=467a7a45-1a26-4599-b129-bcb0c8a3c2a9:
+1=9046420e-d4a5-41fb-81ef-1e7907a9e706:
+[SchematicFrame]
+version=1
 [pcbnew]
 version=1
 PageLayoutDescrFile=

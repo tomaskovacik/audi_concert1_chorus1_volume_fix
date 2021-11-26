@@ -38,8 +38,6 @@ ERC_CheckBusToBusConflicts=1
 ERC_CheckBusToNetConflicts=1
 [ModEditFrame]
 version=1
-[sheetnames]
-1=9046420e-d4a5-41fb-81ef-1e7907a9e706:
 [SchematicFrame]
 version=1
 [pcbnew]
@@ -377,3 +375,5 @@ uViaDrill=0.1
 dPairWidth=0.2
 dPairGap=0.25
 dPairViaGap=0.25
+[sheetnames]
+1=f225c701-36d9-44c5-9993-19c8d4d43562:

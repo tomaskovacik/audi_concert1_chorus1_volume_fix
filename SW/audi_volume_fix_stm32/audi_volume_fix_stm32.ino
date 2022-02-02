@@ -97,7 +97,7 @@ volatile uint8_t dwbp = 0; //display write byte pointer, for each dwdp there is 
 volatile uint8_t grabing_SPI = 0; //flag indicating we are busy grabing front panel display data, so we should not mess with them in main loop
 volatile uint8_t drdp = 0; //display read data pointer for front panel comunication
 
-volatile uint8_t start_volume = 0x82;
+volatile uint8_t start_volume = 0x4E;
 
 volatile uint8_t volume = start_volume; //set start volume here ...
 volatile uint8_t current_volume = start_volume; //set start volume here ..
@@ -226,6 +226,7 @@ void setup ()
   //#ifdef USE_SERAL
   //    USEDSERIAL.println(F("I2C init failed");
   //#endif
+  set_volume();
 }  // end of setup
 
 void printInfo() {

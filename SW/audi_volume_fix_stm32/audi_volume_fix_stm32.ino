@@ -48,15 +48,15 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define mcuDATA PB4//DATA
 #ifdef HWV3
 #define mcuSTATUS PA4 //STATUS/CS
-#define VERSION "1.0-24.10.21-HWv3"
+#define VERSION "1.0-30.03.22-HWv3"
 #else
 #define mcuSTATUS PA15 //STATUS/CS
-#define VERSION "1.0-24.10.21-HWv4"
+#define VERSION "1.0-30.03.22-HWv4"
 #endif
 #if defined(HWV4) || defined(HWV3)
 #define displayRESET PB8
 #else
-#define VERSION "1.0-24.10.21"
+#define VERSION "1.0-30.03.22"
 #define displayRESET PB5
 #endif
 

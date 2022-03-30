@@ -218,12 +218,12 @@ void setup ()
   //init interrupt on STATUS line to grab data send betwen display and main CPU
 
   //serial for debug
-#ifdef USE_SERAL
+#ifdef USE_SERIAL
   USEDSERIAL.begin(115200);
 #endif
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
-  //#ifdef USE_SERAL
+  //#ifdef USE_SERIAL
   //    USEDSERIAL.println(F("I2C init failed");
   //#endif
   set_volume();
@@ -240,7 +240,7 @@ void printInfo() {
 
 void loop()
 {
-#ifdef USE_SERAL
+#ifdef USE_SERIAL
   if (Serial.available()) {
     char serial_char = Serial.read();
     switch (serial_char) {
@@ -287,7 +287,7 @@ void loop()
       uint8_t _data[howmanybytesinpacket];
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
         _data[i] = _msg[drdp][i];
-        //#ifdef USE_SERAL
+        //#ifdef USE_SERIAL
         //   USEDSERIAL.print(_data[i],HEX);
         //#endif
       }

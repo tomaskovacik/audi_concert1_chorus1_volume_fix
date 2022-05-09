@@ -61,15 +61,26 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #endif
 #ifdef HWV3
 #define mcuSTATUS PA4 //STATUS/CS
+<<<<<<< HEAD
 #define VERSION "1.0-09.06.22-HWv3"
 #else//hw v4 and v5
 #define mcuSTATUS PA15 //STATUS/CS
 #define VERSION "1.0-09.06.22-HWv4"
+=======
+#define VERSION "1.0-30.03.22-HWv3"
+#else
+#define mcuSTATUS PA15 //STATUS/CS
+#define VERSION "1.0-30.03.22-HWv4"
+>>>>>>> e39cb261ecd74cd1af776e2fb6826e6140429c7d
 #endif
 #if defined(HWV5) || defined(HWV4) || defined(HWV3)
 #define displayRESET PB8 //not used anyway ... 
 #else
+<<<<<<< HEAD
 #define VERSION "1.0-09.06.22"
+=======
+#define VERSION "1.0-30.03.22"
+>>>>>>> e39cb261ecd74cd1af776e2fb6826e6140429c7d
 #define displayRESET PB5
 #endif
 
@@ -231,12 +242,12 @@ void setup ()
   //init interrupt on STATUS line to grab data send betwen display and main CPU
 
   //serial for debug
-#ifdef USE_SERAL
+#ifdef USE_SERIAL
   USEDSERIAL.begin(115200);
 #endif
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
-  //#ifdef USE_SERAL
+  //#ifdef USE_SERIAL
   //    USEDSERIAL.println(F("I2C init failed");
   //#endif
   set_volume();
@@ -253,7 +264,7 @@ void printInfo() {
 
 void loop()
 {
-#ifdef USE_SERAL
+#ifdef USE_SERIAL
   if (Serial.available()) {
     char serial_char = Serial.read();
     switch (serial_char) {
@@ -300,7 +311,7 @@ void loop()
       uint8_t _data[howmanybytesinpacket];
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
         _data[i] = _msg[drdp][i];
-        //#ifdef USE_SERAL
+        //#ifdef USE_SERIAL
         //   USEDSERIAL.print(_data[i],HEX);
         //#endif
       }

@@ -1,9 +1,17 @@
-// - master for HW v1, v2, v3 (with #define HWV3), v4 (with #define HWV4)
-// 1.0-17.10.21 - disable dumping data, 24mA consuption, with simple yield() hack ... more investigation is required
+// - master for HW v1, v2, v3 (with #define HWV3), v4 (with #define HWV4), v5 with define HWV5
+// module is hold in reseted state when fron panel is off, no last volume is stored ... 
 //#include <Wire.h>
 
-#define HWV3
+//#define HWV3
 //#define HWV4
+
+
+/* version 5
+mcuCLK    = PA5
+mcuDATA   = PA6
+mcuSTATUS = PA15
+*/
+#define HWV5
 
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
@@ -14,7 +22,7 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 
 //TwoWire Swire = TwoWire(PB11, PB10);
 
-#define USE_SERIAL
+//#define USE_SERIAL
 //use Serial for medium-high density devices like stm32F103C8/B
 //user Serial1 for low densty devices like stm32f103c6
 #define USEDSERIAL Serial
@@ -44,19 +52,24 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 //#define mcuDATA 4 //PD2 - DATA
 //#define displayRESET 8
 //STM32
+#ifdef HWV5
+#define mcuCLK PA5 //CLK
+#define mcuDATA PA6//DATA
+#else
 #define mcuCLK PB3 //CLK
 #define mcuDATA PB4//DATA
+#endif
 #ifdef HWV3
 #define mcuSTATUS PA4 //STATUS/CS
-#define VERSION "1.0-24.10.21-HWv3"
-#else
+#define VERSION "1.0-09.06.22-HWv3"
+#else//hw v4 and v5
 #define mcuSTATUS PA15 //STATUS/CS
-#define VERSION "1.0-24.10.21-HWv4"
+#define VERSION "1.0-09.06.22-HWv4"
 #endif
-#if defined(HWV4) || defined(HWV3)
-#define displayRESET PB8
+#if defined(HWV5) || defined(HWV4) || defined(HWV3)
+#define displayRESET PB8 //not used anyway ... 
 #else
-#define VERSION "1.0-24.10.21"
+#define VERSION "1.0-09.06.22"
 #define displayRESET PB5
 #endif
 
@@ -97,7 +110,7 @@ volatile uint8_t dwbp = 0; //display write byte pointer, for each dwdp there is 
 volatile uint8_t grabing_SPI = 0; //flag indicating we are busy grabing front panel display data, so we should not mess with them in main loop
 volatile uint8_t drdp = 0; //display read data pointer for front panel comunication
 
-volatile uint8_t start_volume = 0x4E;
+volatile uint8_t start_volume = 0x66; //was 0xE4- set it 4leves lower, some complaines from BOSE users .. 
 
 volatile uint8_t volume = start_volume; //set start volume here ...
 volatile uint8_t current_volume = start_volume; //set start volume here ..

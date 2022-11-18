@@ -2359,7 +2359,7 @@
   )
 
   (text "    Using the second SPI port (SPI_2)\n    SS    <-->  PB12 <-->  BOARD_SPI2_NSS_PIN\n    SCK   <-->  PB13 <-->  BOARD_SPI2_SCK_PIN\n    MISO  <-->  PB14 <-->  BOARD_SPI2_MISO_PIN\n    MOSI  <-->  PB15 <-->  BOARD_SPI2_MOSI_PIN\n"
-    (at 127.2032 138.5062 0)
+    (at 127.2032 138.5062 180)
     (effects (font (size 1.27 1.27)) (justify right bottom))
     (uuid 1199146e-a60b-416a-b503-e77d6d2892f9)
   )
@@ -2373,7 +2373,7 @@
     (uuid 479331ff-c540-41f4-84e6-b48d65171e59)
   )
   (text "    Using the first SPI port (SPI_1)\n    SS    <-->  PA4 <-->  BOARD_SPI1_NSS_PIN\n    SCK   <-->  PA5 <-->  BOARD_SPI1_SCK_PIN\n    MISO  <-->  PA6 <-->  BOARD_SPI1_MISO_PIN\n    MOSI  <-->  PA7 <-->  BOARD_SPI1_MOSI_PIN"
-    (at 370.8908 84.6836 0)
+    (at 370.8908 84.6836 180)
     (effects (font (size 1.27 1.27)) (justify right bottom))
     (uuid 997c2f12-73ba-4c01-9ee0-42e37cbab790)
   )
@@ -3476,7 +3476,7 @@
     (in_bom yes) (on_board yes)
     (uuid 00000000-0000-0000-0000-00005ad5db61)
     (property "Reference" "R12" (id 0) (at 54.61 100.33 90))
-    (property "Value" "20" (id 1) (at 58.42 101.6 90))
+    (property "Value" "20(NP)" (id 1) (at 58.42 101.6 90))
     (property "Footprint" "Resistors_SMD.pretty:R_0805_HandSoldering" (id 2) (at 54.61 98.552 90)
       (effects (font (size 1.27 1.27)) hide)
     )
@@ -3491,7 +3491,7 @@
     (in_bom yes) (on_board yes)
     (uuid 00000000-0000-0000-0000-00005ad5ddb2)
     (property "Reference" "R13" (id 0) (at 54.61 104.14 90))
-    (property "Value" "20" (id 1) (at 58.42 105.41 90))
+    (property "Value" "20(NP)" (id 1) (at 58.42 105.41 90))
     (property "Footprint" "Resistors_SMD.pretty:R_0805_HandSoldering" (id 2) (at 54.61 105.918 90)
       (effects (font (size 1.27 1.27)) hide)
     )
@@ -3527,7 +3527,7 @@
     (in_bom yes) (on_board yes)
     (uuid 00000000-0000-0000-0000-00005ad67c4f)
     (property "Reference" "R14" (id 0) (at 62.23 92.71 90))
-    (property "Value" "1k5" (id 1) (at 63.5 87.63 90))
+    (property "Value" "1k5(NP)" (id 1) (at 63.5 87.63 90))
     (property "Footprint" "Resistors_SMD.pretty:R_0805_HandSoldering" (id 2) (at 64.008 92.71 90)
       (effects (font (size 1.27 1.27)) hide)
     )
@@ -3682,7 +3682,7 @@
     (in_bom yes) (on_board yes)
     (uuid 00000000-0000-0000-0000-00005ae4cd58)
     (property "Reference" "R17" (id 0) (at 128.143 85.09 90))
-    (property "Value" "1k" (id 1) (at 131.953 86.36 90))
+    (property "Value" "1k(NP)" (id 1) (at 131.953 86.36 90))
     (property "Footprint" "Resistors_SMD.pretty:R_0805_HandSoldering" (id 2) (at 128.143 83.312 90)
       (effects (font (size 1.27 1.27)) hide)
     )
@@ -4096,13 +4096,13 @@
       (reference "R11") (unit 1) (value "1k") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
     )
     (path "/00000000-0000-0000-0000-00005ad5db61"
-      (reference "R12") (unit 1) (value "20") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
+      (reference "R12") (unit 1) (value "20(NP)") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
     )
     (path "/00000000-0000-0000-0000-00005ad5ddb2"
-      (reference "R13") (unit 1) (value "20") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
+      (reference "R13") (unit 1) (value "20(NP)") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
     )
     (path "/00000000-0000-0000-0000-00005ad67c4f"
-      (reference "R14") (unit 1) (value "1k5") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
+      (reference "R14") (unit 1) (value "1k5(NP)") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
     )
     (path "/00000000-0000-0000-0000-00005ae4cc42"
       (reference "R15") (unit 1) (value "1k(NP)") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
@@ -4111,7 +4111,7 @@
       (reference "R16") (unit 1) (value "1k(NP)") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
     )
     (path "/00000000-0000-0000-0000-00005ae4cd58"
-      (reference "R17") (unit 1) (value "1k") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
+      (reference "R17") (unit 1) (value "1k(NP)") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")
     )
     (path "/00000000-0000-0000-0000-00005ad78ebb"
       (reference "R18") (unit 1) (value "1M") (footprint "Resistors_SMD.pretty:R_0805_HandSoldering")

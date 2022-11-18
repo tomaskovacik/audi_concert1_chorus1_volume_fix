@@ -22,10 +22,10 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 
 //TwoWire Swire = TwoWire(PB11, PB10);
 
-//#define USE_SERIAL
+//#define UE_SERIAL
 //use Serial for medium-high density devices like stm32F103C8/B
 //user Serial1 for low densty devices like stm32f103c6
-#define USEDSERIAL Serial
+#define USEDSERIAL Serial1
 /*
     SPI comunication between motorola MC68HC05B32 cpu to front panel ST6280
     basics:
@@ -110,7 +110,7 @@ volatile uint8_t dwbp = 0; //display write byte pointer, for each dwdp there is 
 volatile uint8_t grabing_SPI = 0; //flag indicating we are busy grabing front panel display data, so we should not mess with them in main loop
 volatile uint8_t drdp = 0; //display read data pointer for front panel comunication
 
-volatile uint8_t start_volume = 0x66; //was 0xE4- set it 4leves lower, some complaines from BOSE users .. 
+volatile uint8_t start_volume = 0xBA; //was 0xE4- set it 4leves lower, some complaines from BOSE users .. 
 
 volatile uint8_t volume = start_volume; //set start volume here ...
 volatile uint8_t current_volume = start_volume; //set start volume here ..
@@ -207,7 +207,7 @@ void set_unmute();
 void setup ()
 {
   //PB3 works inly in this is called
-  enableDebugPorts(); //required if not USB upload is used, for example pure STLINK or serial upload - perfect for lowdensity devices (103C6 4exmaple)
+  //enableDebugPorts(); //required if not USB upload is used, for example pure STLINK or serial upload - perfect for lowdensity devices (103C6 4exmaple)
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;
   volume_packet[1] = 0x02;

@@ -2,7 +2,7 @@
 // module is hold in reseted state when fron panel is off, no last volume is stored ... 
 //#include <Wire.h>
 
-//#define HWV3
+#define HWV3
 //#define HWV4
 
 
@@ -11,7 +11,7 @@ mcuCLK    = PA5
 mcuDATA   = PA6
 mcuSTATUS = PA15
 */
-#define HWV5
+//#define HWV5
 
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
@@ -22,10 +22,10 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 
 //TwoWire Swire = TwoWire(PB11, PB10);
 
-//#define UE_SERIAL
+#define USE_SERIAL 1 // FIX TYPO
 //use Serial for medium-high density devices like stm32F103C8/B
 //user Serial1 for low densty devices like stm32f103c6
-#define USEDSERIAL Serial1
+#define USEDSERIAL Serial
 /*
     SPI comunication between motorola MC68HC05B32 cpu to front panel ST6280
     basics:
@@ -60,16 +60,16 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #define mcuDATA PB4//DATA
 #endif
 #ifdef HWV3
-#define mcuSTATUS PA4 //STATUS/CS
-#define VERSION "1.0-09.06.22-HWv3"
+#define mcuSTATUS PA15 //STATUS/CS <- THIS BUG FROM 2020.11.20 
+#define VERSION "1.0-2023.02.15-HWv3"
 #else//hw v4 and v5
 #define mcuSTATUS PA15 //STATUS/CS
-#define VERSION "1.0-09.06.22-HWv4"
+#define VERSION "1.0-2023.02.15-HWv4"
 #endif
 #if defined(HWV5) || defined(HWV4) || defined(HWV3)
 #define displayRESET PB8 //not used anyway ... 
 #else
-#define VERSION "1.0-09.06.22"
+#define VERSION "1.0-2023.02.15"
 #define displayRESET PB5
 #endif
 

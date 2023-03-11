@@ -22,7 +22,7 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 
 //TwoWire Swire = TwoWire(PB11, PB10);
 
-//#define UE_SERIAL
+//#define USE_SERIAL
 //use Serial for medium-high density devices like stm32F103C8/B
 //user Serial1 for low densty devices like stm32f103c6
 #define USEDSERIAL Serial1

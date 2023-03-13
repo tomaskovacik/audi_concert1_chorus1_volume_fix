@@ -1,4 +1,8 @@
-// - master for HW v1, v2, v3 (with #define HWV3), v4 (with #define HWV4), v5 with define HWV5
+// - master for HW 
+// HWv1 and HWv2 without any #define regarding HW version
+// HWv3 with #define HWV3
+// HWv4 with #define HWV4
+// HWv5 with #define HWV5
 // module is hold in reseted state when fron panel is off, no last volume is stored ... 
 //#include <Wire.h>
 

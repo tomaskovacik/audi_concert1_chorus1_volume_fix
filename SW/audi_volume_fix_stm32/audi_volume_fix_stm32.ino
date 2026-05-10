@@ -66,7 +66,10 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #ifdef HWV3
 #define mcuSTATUS PA4 //STATUS/CS
 #define VERSION "1.0-09.06.22-HWv3"
-#else//hw v4 and v5
+#elif defined(HWV5)
+#define mcuSTATUS PA15 //STATUS/CS
+#define VERSION "1.0-09.06.22-HWv5"
+#else //hw v4
 #define mcuSTATUS PA15 //STATUS/CS
 #define VERSION "1.0-09.06.22-HWv4"
 #endif
@@ -246,14 +249,15 @@ void setup ()
   set_volume();
 }  // end of setup
 
+#ifdef USE_SERIAL
 void printInfo() {
   USEDSERIAL.print(F("Firmware version: "));
   USEDSERIAL.println(F(VERSION));
   USEDSERIAL.println(F("(C) kovo, GPL3"));
   USEDSERIAL.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
   USEDSERIAL.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
-  // USEDSERIAL.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
 }
+#endif
 
 void loop()
 {
@@ -414,133 +418,41 @@ void set_unmute() {
   }
 }
 
+// Valid volume levels: 0x10 = loudest, 0xFF = off (mute).
+// Lower hex value means louder; steps grow larger at higher (quieter) end.
+const uint8_t PROGMEM volume_steps[] = {
+  0x10, 0x12, 0x16, 0x1A, 0x1E, 0x22, 0x26, 0x2A,
+  0x2E, 0x32, 0x36, 0x3A, 0x3E, 0x42, 0x46, 0x4A,
+  0x4E, 0x52, 0x56, 0x5A, 0x5E, 0x66, 0x72, 0x82,
+  0x92, 0xA2, 0xBA, 0xD2, 0xEA, 0xFF
+};
+#define VOLUME_STEPS_COUNT ((uint8_t)(sizeof(volume_steps) / sizeof(volume_steps[0])))
+
 void set_volume_up() {
   mute = 1; //fix #3
-  // volume, 0xFF=off, 0x00=full on
-  // if (volume == 0xFF) set_unmute();
-  if (volume > 0xEA) {
-    volume = 0xEA;
-  } else if (volume > 0xD2) {
-    volume = 0xD2;
-  } else if (volume > 0xBA) {
-    volume = 0xBA;
-  } else if (volume > 0xA2) {
-    volume = 0xA2;
-  } else if (volume > 0x92) {
-    volume = 0x92;
-  } else if (volume > 0x82) {
-    volume = 0x82;
-  } else if (volume > 0x72) {
-    volume = 0x72;
-  } else if (volume > 0x66) {
-    volume = 0x66;
-  } else if (volume > 0x5E) {
-    volume = 0x5E;
-  } else if (volume > 0x5A) {
-    volume = 0x5A;
-  } else if (volume > 0x56) {
-    volume = 0x56;
-  } else if (volume > 0x52) {
-    volume = 0x52;
-  } else if (volume > 0x4E) {
-    volume = 0x4E;
-  } else if (volume > 0x4A) {
-    volume = 0x4A;
-  } else if (volume > 0x46) {
-    volume = 0x46;
-  } else if (volume > 0x42) {
-    volume = 0x42;
-  } else if (volume > 0x3E) { //after this its decrement of 2
-    volume = 0x3E;
-  } else if (volume > 0x3A) {
-    volume = 0x3A;
-  } else if (volume > 0x36) {
-    volume = 0x36;
-  } else if (volume > 0x32) {
-    volume = 0x32;
-  } else if (volume > 0x2E) {
-    volume = 0x2E;
-  } else if (volume > 0x2A) {
-    volume = 0x2A;
-  } else if (volume > 0x26) {
-    volume = 0x26;
-  } else if (volume > 0x22) {
-    volume = 0x22;
-  } else if (volume > 0x1E) {
-    volume = 0x1E;
-  } else if (volume > 0x1A) {
-    volume = 0x1A;
-  } else if (volume > 0x16) {
-    volume = 0x16;
-  } else if (volume > 0x12) {
-    volume = 0x12;
-  } else if (volume > 0x10) {
-    volume = 0x10;
+  // volume, 0xFF=off, 0x00=full on; lower hex = louder
+  // Find the largest step strictly below the current volume and snap to it.
+  for (int8_t i = VOLUME_STEPS_COUNT - 1; i >= 0; i--) {
+    uint8_t step = pgm_read_byte(&volume_steps[i]);
+    if (step < volume) {
+      volume = step;
+      return;
+    }
   }
-  if (volume < 0x10) volume = 0x10; //top volume, seen on original comunication was never less then 0x10
+  volume = pgm_read_byte(&volume_steps[0]); //top volume, seen on original comunication was never less then 0x10
 }
 
 void set_volume_down() {
   mute = 1; //fix #3
-  if (volume < 0x14) {
-    volume = 0x14;
-  } else if (volume < 0x18) {
-    volume = 0x18;//+4
-  } else if (volume < 0x1C) {
-    volume = 0x1C;//+4
-  } else if (volume < 0x20) {
-    volume = 0x20;//+4
-  } else if (volume < 0x24) {
-    volume = 0x24;//+4
-  } else if (volume < 0x28) {
-    volume = 0x28;//+4
-  } else if (volume < 0x2C) {
-    volume = 0x2C;//+4
-  } else if (volume < 0x30) {
-    volume = 0x30;//+4
-  } else if (volume < 0x34) {
-    volume = 0x34;//+4
-  } else if (volume < 0x38) {
-    volume = 0x38;//+4
-  } else if (volume < 0x3C) {
-    volume = 0x3C;//+4
-  } else if (volume < 0x40) {
-    volume = 0x40;//+4
-  } else if (volume < 0x44) {
-    volume = 0x44;//+4
-  } else if (volume < 0x48) {
-    volume = 0x48;//+4
-  } else if (volume < 0x4C) {
-    volume = 0x4C;//+4
-  } else if (volume < 0x50) {
-    volume = 0x50;//+4
-  } else if (volume < 0x54) {
-    volume = 0x54;//+4
-  } else if (volume < 0x58) {
-    volume = 0x58;//+4
-  } else if (volume < 0x5C) {
-    volume = 0x5C;//+4
-  } else if (volume < 0x60) {
-    volume = 0x60;//+4
-  } else if (volume < 0x68) {
-    volume = 0x68;//+8
-  } else if (volume < 0x74) {
-    volume = 0x74;//+12
-  } else if (volume < 0x84) {
-    volume = 0x84;//+16
-  } else if (volume < 0x94) {
-    volume = 0x94;//+16
-  } else if (volume < 0xA4) {
-    volume = 0xA4;//+16
-  } else if (volume < 0xBE) {
-    volume = 0xBE;
-  } else if (volume < 0xD6) {
-    volume = 0xD6;
-  } else if (volume < 0xEE) {
-    volume = 0xEE;
-  } else if (volume < 0xFF) {
-    volume = 0xFF;
+  // Find the smallest step strictly above the current volume and snap to it.
+  for (uint8_t i = 0; i < VOLUME_STEPS_COUNT; i++) {
+    uint8_t step = pgm_read_byte(&volume_steps[i]);
+    if (step > volume) {
+      volume = step;
+      return;
+    }
   }
+  volume = pgm_read_byte(&volume_steps[VOLUME_STEPS_COUNT - 1]); //bottom volume (off)
 }
 /*
 
@@ -997,8 +909,10 @@ void enableInteruptOnCLK()
       _msg[dwdp][dwbp++] = 0;
     }
     dwbp = 0; //set byte write pointer to begining
-    dwdp++; //increment write pointer
-    if (dwdp == howmanypackets) dwdp = 0; //if we reach last+1 position in array for packet, go back to 0
+    // only advance write pointer if there is space in the ring buffer
+    uint8_t next_dwdp = dwdp + 1;
+    if (next_dwdp == howmanypackets) next_dwdp = 0;
+    if (next_dwdp != drdp) dwdp = next_dwdp;
     attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING); //enable this interrupt again, with same parameters
     //after this interupt is still set to rising on STATUS line,
     grabing_SPI = 0;//we are safe to manipulate data in main loop, I just move this from disableInteruptOnCLK function
@@ -1016,8 +930,8 @@ void disableInteruptOnCLK()
 {
   detachInterrupt(digitalPinToInterrupt(mcuCLK)); //so STATUS is low, so all data are clocked in:
   _msg[dwdp][dwbp++] = _byte; //move data from tempporary variable to array based on pointer of current packet and current byte in packet
-  if (dwbp == howmanybytesinpacket ) { //this can happend, but it must be last byte in packet, otherwise we will rewrite data in packet row
-    dwbp = 0;
+  if (dwbp >= howmanybytesinpacket) { //this can happen, cap to avoid overwriting adjacent packet row
+    dwbp = howmanybytesinpacket - 1;
 #ifdef USE_SERIAL
     USEDSERIAL.println(F("dwbp overflow"));//put this out, just to know,
 #endif
@@ -1043,16 +957,34 @@ void readCLK()
 void receiveEvent (int howMany)
 {
   // USEDSERIAL.print(F("grabing i2c: wdp: "));  USEDSERIAL.print(wdp);//  USEDSERIAL.print(F(" howmany: ");  USEDSERIAL.println(howMany);
-  reading_i2c = 1;
-  data[wdp][0] = howMany;
-  for (uint8_t i = 0; i < howMany; i++) {
 
-    data[wdp][i + 1] = Wire.read();
+  // guard: clamp to max payload so we never write past the end of data[wdp]
+  int clampedHowMany = howMany;
+  if (clampedHowMany < 0) clampedHowMany = 0;
+  if (clampedHowMany >= howmanybytesinpacket) clampedHowMany = howmanybytesinpacket - 1;
+
+  // guard: drop packet if write pointer would catch up to the read pointer
+  uint8_t next_wdp = wdp + 1;
+  if (next_wdp == howmanypackets) next_wdp = 0;
+  if (next_wdp == rdp) {
+    // buffer full: drain the I2C bus and discard the incoming packet
+    for (int i = 0; i < howMany; i++) Wire.read();
+    reading_i2c = 0;
+    return;
+  }
+
+  reading_i2c = 1;
+  data[wdp][0] = (uint8_t)clampedHowMany;
+  for (int i = 0; i < howMany; i++) {
+    uint8_t b = Wire.read();
+    if (i < clampedHowMany) {
+      data[wdp][i + 1] = b; // store only bytes that fit
+    }
+    // excess bytes are read and discarded to keep the I2C bus clean
     // USEDSERIAL.print(data[wdp][i + 1], HEX);
   }
 
-  wdp++;
-  if (wdp == howmanypackets) wdp = 0;
+  wdp = next_wdp;
   reading_i2c = 0;
 }  // end of receiveEvent
 
@@ -1295,8 +1227,8 @@ void decode_i2c(uint8_t data[howmanybytesinpacket]) {
         USEDSERIAL.print(F("Speaker Attenuator right front: "));
         spk_atten(c);
         break;
-      case 7: // Speaker Attenuator left rear
-        USEDSERIAL.print(F("Speaker Attenuator left rear: "));
+      case 7: // Speaker Attenuator right rear
+        USEDSERIAL.print(F("Speaker Attenuator right rear: "));
         spk_atten(c);
         break;
       case 8: // mute

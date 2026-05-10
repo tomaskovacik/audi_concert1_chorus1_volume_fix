@@ -37,7 +37,7 @@ These use a different design and so are not compatible with this module. I never
 Known issues <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/issues">are here</a>
 
 #### Video
-Module in action: <a href="https://youtu.be/YbFa_UYPMRQ"></a>
+Module in action: <a href="https://youtu.be/YbFa_UYPMRQ">YouTube video</a>
 
 #### Schematics:
 
@@ -46,7 +46,7 @@ Module in action: <a href="https://youtu.be/YbFa_UYPMRQ"></a>
 
 Schematics in <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/master/HW/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.pdf">pdf</a>.
 
-Assemble plan for latest v4 is <a href="https://tomaskovacik.github.io/audi_concert1_chorus1_volume_fix/HW/audi_concert1_chorus1_volume_fix/bom_v4_for_v1_code/ibom.html">here<a/>. Components with value prefi NP_ are not required (not populated). These are there for future features. 1k_GALA resistor has to be populated if SW with <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/gala/SW/audi_volume_fix_stm32/audi_volume_fix_stm32.ino">gala</a> support is used (SW from gala branch). AP for old v1 hw is <a href="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/HW/audi_concert1_chorus1_volume_fix/assemble_plan1_0.png">here</a>.
+Assemble plan for latest v5 is <a href="https://tomaskovacik.github.io/audi_concert1_chorus1_volume_fix/HW/audi_concert1_chorus1_volume_fix/bom_v5/ibom.html">here</a>. Components with value prefix NP_ are not required (not populated). These are there for future features. 1k_GALA resistor has to be populated if SW with <a href="https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/gala/SW/audi_volume_fix_stm32/audi_volume_fix_stm32.ino">gala</a> support is used (SW from gala branch). AP for old v1 hw is <a href="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/HW/audi_concert1_chorus1_volume_fix/assemble_plan1_0.png">here</a>.
 
 
 Pictures of finished product:
@@ -59,7 +59,7 @@ Pictures of finished product:
 
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20180906_180752.jpg">
 
-Bottom side, with PLCC52 socket, inside part of pastic need to be cut:
+Bottom side, with PLCC52 socket, inside part of plastic need to be cut:
 
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20180906_180757.jpg">
 
@@ -67,7 +67,7 @@ Upper side, with comments to sockets
 
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20180920_154234_comments.jpg">
 
-How to wire it (currently without intefacing with front pannel)
+How to wire it (currently without interfacing with front panel)
 
 <img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/master/Pics/20181003_170247.jpg">
 
@@ -81,6 +81,6 @@ Contributions are welcome
 
 # PCBs
 
-PCBs are on sale also as whole product, kitt (PCB, soldered crystals, unsoldered preprogramed IC, pasives,PLCC52 socket)
+PCBs are on sale also as whole product, kit (PCB, soldered crystals, unsoldered preprogrammed IC, passives, PLCC52 socket)
 
 <a href="https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-larges.png" alt="I sell on Tindie" width="200" height="104"></a>

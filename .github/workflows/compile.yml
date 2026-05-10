@@ -1,0 +1,26 @@
+name: Compile Sketch
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile sketch
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: "STMicroelectronics:stm32:GenF1:pnum=BLUEPILL_F103C8"
+          platforms: |
+            - name: STMicroelectronics:stm32
+              source-url: https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json
+          libraries: |
+            - name: SlowSoftWire
+            - name: EEPROM
+          sketch-paths: |
+            - SW/audi_volume_fix_stm32

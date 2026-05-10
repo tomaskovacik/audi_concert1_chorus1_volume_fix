@@ -418,133 +418,39 @@ void set_unmute() {
   }
 }
 
+// Valid volume levels: 0x10 = loudest, 0xFF = off (mute).
+// Lower hex value means louder; steps grow larger at higher (quieter) end.
+const uint8_t PROGMEM volume_steps[] = {
+  0x10, 0x12, 0x16, 0x1A, 0x1E, 0x22, 0x26, 0x2A,
+  0x2E, 0x32, 0x36, 0x3A, 0x3E, 0x42, 0x46, 0x4A,
+  0x4E, 0x52, 0x56, 0x5A, 0x5E, 0x66, 0x72, 0x82,
+  0x92, 0xA2, 0xBA, 0xD2, 0xEA, 0xFF
+};
+#define VOLUME_STEPS_COUNT ((uint8_t)(sizeof(volume_steps) / sizeof(volume_steps[0])))
+
 void set_volume_up() {
   mute = 1; //fix #3
-  // volume, 0xFF=off, 0x00=full on
-  // if (volume == 0xFF) set_unmute();
-  if (volume > 0xEA) {
-    volume = 0xEA;
-  } else if (volume > 0xD2) {
-    volume = 0xD2;
-  } else if (volume > 0xBA) {
-    volume = 0xBA;
-  } else if (volume > 0xA2) {
-    volume = 0xA2;
-  } else if (volume > 0x92) {
-    volume = 0x92;
-  } else if (volume > 0x82) {
-    volume = 0x82;
-  } else if (volume > 0x72) {
-    volume = 0x72;
-  } else if (volume > 0x66) {
-    volume = 0x66;
-  } else if (volume > 0x5E) {
-    volume = 0x5E;
-  } else if (volume > 0x5A) {
-    volume = 0x5A;
-  } else if (volume > 0x56) {
-    volume = 0x56;
-  } else if (volume > 0x52) {
-    volume = 0x52;
-  } else if (volume > 0x4E) {
-    volume = 0x4E;
-  } else if (volume > 0x4A) {
-    volume = 0x4A;
-  } else if (volume > 0x46) {
-    volume = 0x46;
-  } else if (volume > 0x42) {
-    volume = 0x42;
-  } else if (volume > 0x3E) { //after this its decrement of 2
-    volume = 0x3E;
-  } else if (volume > 0x3A) {
-    volume = 0x3A;
-  } else if (volume > 0x36) {
-    volume = 0x36;
-  } else if (volume > 0x32) {
-    volume = 0x32;
-  } else if (volume > 0x2E) {
-    volume = 0x2E;
-  } else if (volume > 0x2A) {
-    volume = 0x2A;
-  } else if (volume > 0x26) {
-    volume = 0x26;
-  } else if (volume > 0x22) {
-    volume = 0x22;
-  } else if (volume > 0x1E) {
-    volume = 0x1E;
-  } else if (volume > 0x1A) {
-    volume = 0x1A;
-  } else if (volume > 0x16) {
-    volume = 0x16;
-  } else if (volume > 0x12) {
-    volume = 0x12;
-  } else if (volume > 0x10) {
-    volume = 0x10;
+  // volume, 0xFF=off, 0x00=full on; lower hex = louder
+  // Find the largest step strictly below the current volume and snap to it.
+  for (int8_t i = VOLUME_STEPS_COUNT - 1; i >= 0; i--) {
+    if (pgm_read_byte(&volume_steps[i]) < volume) {
+      volume = pgm_read_byte(&volume_steps[i]);
+      return;
+    }
   }
-  if (volume < 0x10) volume = 0x10; //top volume, seen on original comunication was never less then 0x10
+  volume = pgm_read_byte(&volume_steps[0]); //top volume, seen on original comunication was never less then 0x10
 }
 
 void set_volume_down() {
   mute = 1; //fix #3
-  if (volume < 0x14) {
-    volume = 0x14;
-  } else if (volume < 0x18) {
-    volume = 0x18;//+4
-  } else if (volume < 0x1C) {
-    volume = 0x1C;//+4
-  } else if (volume < 0x20) {
-    volume = 0x20;//+4
-  } else if (volume < 0x24) {
-    volume = 0x24;//+4
-  } else if (volume < 0x28) {
-    volume = 0x28;//+4
-  } else if (volume < 0x2C) {
-    volume = 0x2C;//+4
-  } else if (volume < 0x30) {
-    volume = 0x30;//+4
-  } else if (volume < 0x34) {
-    volume = 0x34;//+4
-  } else if (volume < 0x38) {
-    volume = 0x38;//+4
-  } else if (volume < 0x3C) {
-    volume = 0x3C;//+4
-  } else if (volume < 0x40) {
-    volume = 0x40;//+4
-  } else if (volume < 0x44) {
-    volume = 0x44;//+4
-  } else if (volume < 0x48) {
-    volume = 0x48;//+4
-  } else if (volume < 0x4C) {
-    volume = 0x4C;//+4
-  } else if (volume < 0x50) {
-    volume = 0x50;//+4
-  } else if (volume < 0x54) {
-    volume = 0x54;//+4
-  } else if (volume < 0x58) {
-    volume = 0x58;//+4
-  } else if (volume < 0x5C) {
-    volume = 0x5C;//+4
-  } else if (volume < 0x60) {
-    volume = 0x60;//+4
-  } else if (volume < 0x68) {
-    volume = 0x68;//+8
-  } else if (volume < 0x74) {
-    volume = 0x74;//+12
-  } else if (volume < 0x84) {
-    volume = 0x84;//+16
-  } else if (volume < 0x94) {
-    volume = 0x94;//+16
-  } else if (volume < 0xA4) {
-    volume = 0xA4;//+16
-  } else if (volume < 0xBE) {
-    volume = 0xBE;
-  } else if (volume < 0xD6) {
-    volume = 0xD6;
-  } else if (volume < 0xEE) {
-    volume = 0xEE;
-  } else if (volume < 0xFF) {
-    volume = 0xFF;
+  // Find the smallest step strictly above the current volume and snap to it.
+  for (uint8_t i = 0; i < VOLUME_STEPS_COUNT; i++) {
+    if (pgm_read_byte(&volume_steps[i]) > volume) {
+      volume = pgm_read_byte(&volume_steps[i]);
+      return;
+    }
   }
+  volume = pgm_read_byte(&volume_steps[VOLUME_STEPS_COUNT - 1]); //bottom volume (off)
 }
 /*
 

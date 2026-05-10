@@ -66,7 +66,10 @@ SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
 #ifdef HWV3
 #define mcuSTATUS PA4 //STATUS/CS
 #define VERSION "1.0-09.06.22-HWv3"
-#else//hw v4 and v5
+#elif defined(HWV5)
+#define mcuSTATUS PA15 //STATUS/CS
+#define VERSION "1.0-09.06.22-HWv5"
+#else //hw v4
 #define mcuSTATUS PA15 //STATUS/CS
 #define VERSION "1.0-09.06.22-HWv4"
 #endif
@@ -246,14 +249,15 @@ void setup ()
   set_volume();
 }  // end of setup
 
+#ifdef USE_SERIAL
 void printInfo() {
   USEDSERIAL.print(F("Firmware version: "));
   USEDSERIAL.println(F(VERSION));
   USEDSERIAL.println(F("(C) kovo, GPL3"));
   USEDSERIAL.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
   USEDSERIAL.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
-  // USEDSERIAL.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
 }
+#endif
 
 void loop()
 {
@@ -997,8 +1001,10 @@ void enableInteruptOnCLK()
       _msg[dwdp][dwbp++] = 0;
     }
     dwbp = 0; //set byte write pointer to begining
-    dwdp++; //increment write pointer
-    if (dwdp == howmanypackets) dwdp = 0; //if we reach last+1 position in array for packet, go back to 0
+    // only advance write pointer if there is space in the ring buffer
+    uint8_t next_dwdp = dwdp + 1;
+    if (next_dwdp == howmanypackets) next_dwdp = 0;
+    if (next_dwdp != drdp) dwdp = next_dwdp;
     attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING); //enable this interrupt again, with same parameters
     //after this interupt is still set to rising on STATUS line,
     grabing_SPI = 0;//we are safe to manipulate data in main loop, I just move this from disableInteruptOnCLK function
@@ -1016,8 +1022,8 @@ void disableInteruptOnCLK()
 {
   detachInterrupt(digitalPinToInterrupt(mcuCLK)); //so STATUS is low, so all data are clocked in:
   _msg[dwdp][dwbp++] = _byte; //move data from tempporary variable to array based on pointer of current packet and current byte in packet
-  if (dwbp == howmanybytesinpacket ) { //this can happend, but it must be last byte in packet, otherwise we will rewrite data in packet row
-    dwbp = 0;
+  if (dwbp >= howmanybytesinpacket) { //this can happen, cap to avoid overwriting adjacent packet row
+    dwbp = howmanybytesinpacket - 1;
 #ifdef USE_SERIAL
     USEDSERIAL.println(F("dwbp overflow"));//put this out, just to know,
 #endif
@@ -1043,16 +1049,34 @@ void readCLK()
 void receiveEvent (int howMany)
 {
   // USEDSERIAL.print(F("grabing i2c: wdp: "));  USEDSERIAL.print(wdp);//  USEDSERIAL.print(F(" howmany: ");  USEDSERIAL.println(howMany);
-  reading_i2c = 1;
-  data[wdp][0] = howMany;
-  for (uint8_t i = 0; i < howMany; i++) {
 
-    data[wdp][i + 1] = Wire.read();
+  // guard: clamp to max payload so we never write past the end of data[wdp]
+  int clampedHowMany = howMany;
+  if (clampedHowMany < 0) clampedHowMany = 0;
+  if (clampedHowMany >= howmanybytesinpacket) clampedHowMany = howmanybytesinpacket - 1;
+
+  // guard: drop packet if write pointer would catch up to the read pointer
+  uint8_t next_wdp = wdp + 1;
+  if (next_wdp == howmanypackets) next_wdp = 0;
+  if (next_wdp == rdp) {
+    // buffer full: drain the I2C bus and discard the incoming packet
+    for (int i = 0; i < howMany; i++) Wire.read();
+    reading_i2c = 0;
+    return;
+  }
+
+  reading_i2c = 1;
+  data[wdp][0] = (uint8_t)clampedHowMany;
+  for (int i = 0; i < howMany; i++) {
+    uint8_t b = Wire.read();
+    if (i < clampedHowMany) {
+      data[wdp][i + 1] = b; // store only bytes that fit
+    }
+    // excess bytes are read and discarded to keep the I2C bus clean
     // USEDSERIAL.print(data[wdp][i + 1], HEX);
   }
 
-  wdp++;
-  if (wdp == howmanypackets) wdp = 0;
+  wdp = next_wdp;
   reading_i2c = 0;
 }  // end of receiveEvent
 
@@ -1295,8 +1319,8 @@ void decode_i2c(uint8_t data[howmanybytesinpacket]) {
         USEDSERIAL.print(F("Speaker Attenuator right front: "));
         spk_atten(c);
         break;
-      case 7: // Speaker Attenuator left rear
-        USEDSERIAL.print(F("Speaker Attenuator left rear: "));
+      case 7: // Speaker Attenuator right rear
+        USEDSERIAL.print(F("Speaker Attenuator right rear: "));
         spk_atten(c);
         break;
       case 8: // mute

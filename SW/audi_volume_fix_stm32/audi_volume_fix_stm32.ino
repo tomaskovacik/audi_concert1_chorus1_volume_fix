@@ -433,8 +433,9 @@ void set_volume_up() {
   // volume, 0xFF=off, 0x00=full on; lower hex = louder
   // Find the largest step strictly below the current volume and snap to it.
   for (int8_t i = VOLUME_STEPS_COUNT - 1; i >= 0; i--) {
-    if (pgm_read_byte(&volume_steps[i]) < volume) {
-      volume = pgm_read_byte(&volume_steps[i]);
+    uint8_t step = pgm_read_byte(&volume_steps[i]);
+    if (step < volume) {
+      volume = step;
       return;
     }
   }
@@ -445,8 +446,9 @@ void set_volume_down() {
   mute = 1; //fix #3
   // Find the smallest step strictly above the current volume and snap to it.
   for (uint8_t i = 0; i < VOLUME_STEPS_COUNT; i++) {
-    if (pgm_read_byte(&volume_steps[i]) > volume) {
-      volume = pgm_read_byte(&volume_steps[i]);
+    uint8_t step = pgm_read_byte(&volume_steps[i]);
+    if (step > volume) {
+      volume = step;
       return;
     }
   }

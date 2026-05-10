@@ -19,10 +19,10 @@ mcuSTATUS = PA15
 
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
-#include <SlowSoftWire.h> //so we do not have single lib for slave/master, so we have to init another one for master .... cose we do not have 3HW i2c .... tiktak ...
+#include <FlexWire.h> //so we do not have single lib for slave/master, so we have to init another one for master .... cose we do not have 3HW i2c .... tiktak ...
 #include "audi_concert_panel.h"
 
-SlowSoftWire SWire = SlowSoftWire(PB11, PB10);
+FlexWire SWire = FlexWire(PB11, PB10);
 
 //TwoWire Swire = TwoWire(PB11, PB10);
 

@@ -415,7 +415,6 @@ void set_unmute() {
 }
 
 void set_volume_up() {
-  mute = 1; //fix #3
   // volume, 0xFF=off, 0x00=full on
   // if (volume == 0xFF) set_unmute();
   if (volume > 0xEA) {
@@ -481,7 +480,6 @@ void set_volume_up() {
 }
 
 void set_volume_down() {
-  mute = 1; //fix #3
   if (volume < 0x14) {
     volume = 0x14;
   } else if (volume < 0x18) {
@@ -548,6 +546,11 @@ void set_volume_down() {
 
 */
 void set_volume() {
+  // Save current_volume before ramping to mute so unmute can restore the correct level.
+  // This mirrors what the I2C mute handler in loop() does: save then ramp.
+  if (volume == 0xFF && !mute) {
+    saved_volume = current_volume;
+  }
   while (volume != current_volume) { //need to fix volume
     //     USEDSERIAL.println("=================== before fix ====================");
     //     USEDSERIAL.print("current volume: ");  USEDSERIAL.println(current_volume, HEX);

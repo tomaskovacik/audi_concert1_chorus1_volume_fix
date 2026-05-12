@@ -94,6 +94,7 @@ FlexWire SWire = FlexWire(PB11, PB10);
 //array is flat circular buffer of howmanypackets * howmanybytesinpacket bytes
 #define howmanypackets 20
 #define howmanybytesinpacket 15
+#define PACKET_IDX(pkt, byte) ((pkt) * howmanybytesinpacket + (byte))
 
 const byte MY_ADDRESS = I2C_7BITADDR;
 
@@ -303,7 +304,7 @@ void loop()
       //or we should just send pointer drdp as function parameter, array with packet is not local ....no I try it and it will use 1% more of program storage space  ...
       uint8_t _data[howmanybytesinpacket];
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
-        _data[i] = _msg[drdp * howmanybytesinpacket + i];
+        _data[i] = _msg[PACKET_IDX(drdp, i)];
         //#ifdef USE_SERIAL
         //   USEDSERIAL.print(_data[i],HEX);
         //#endif
@@ -340,7 +341,7 @@ void loop()
       // USEDSERIAL.println(rdp);
       // USEDSERIAL.println(wdp);
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
-        _data[i] = data[rdp * howmanybytesinpacket + i];
+        _data[i] = data[PACKET_IDX(rdp, i)];
         // USEDSERIAL.print(_data[i],HEX);  USEDSERIAL.print(" ");
       }
       // USEDSERIAL.println();
@@ -384,7 +385,7 @@ void loop()
 
 
       for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
-        data[rdp * howmanybytesinpacket + i] = 0;
+        data[PACKET_IDX(rdp, i)] = 0;
       }
       rdp++;
       if (rdp == howmanypackets) rdp = 0;
@@ -994,7 +995,7 @@ void enableInteruptOnCLK()
 
     //CLK is HIGH, this is end of  packet
     while (dwbp < howmanybytesinpacket) { //clean array from current write pointer to end of packet
-      _msg[dwdp * howmanybytesinpacket + dwbp++] = 0;
+      _msg[PACKET_IDX(dwdp, dwbp++)] = 0;
     }
     dwbp = 0; //set byte write pointer to begining
     dwdp++; //increment write pointer
@@ -1015,7 +1016,7 @@ void enableInteruptOnCLK()
 void disableInteruptOnCLK()
 {
   detachInterrupt(digitalPinToInterrupt(mcuCLK)); //so STATUS is low, so all data are clocked in:
-  _msg[dwdp * howmanybytesinpacket + dwbp++] = _byte; //move data from tempporary variable to array based on pointer of current packet and current byte in packet
+  _msg[PACKET_IDX(dwdp, dwbp++)] = _byte; //move data from tempporary variable to array based on pointer of current packet and current byte in packet
   if (dwbp == howmanybytesinpacket ) { //this can happend, but it must be last byte in packet, otherwise we will rewrite data in packet row
     dwbp = 0;
 #ifdef USE_SERIAL
@@ -1044,11 +1045,11 @@ void receiveEvent (int howMany)
 {
   // USEDSERIAL.print(F("grabing i2c: wdp: "));  USEDSERIAL.print(wdp);//  USEDSERIAL.print(F(" howmany: ");  USEDSERIAL.println(howMany);
   reading_i2c = 1;
-  data[wdp * howmanybytesinpacket] = howMany;
+  data[PACKET_IDX(wdp, 0)] = howMany;
   for (uint8_t i = 0; i < howMany; i++) {
 
-    data[wdp * howmanybytesinpacket + i + 1] = Wire.read();
-    // USEDSERIAL.print(data[wdp * howmanybytesinpacket + i + 1], HEX);
+    data[PACKET_IDX(wdp, i + 1)] = Wire.read();
+    // USEDSERIAL.print(data[PACKET_IDX(wdp, i + 1)], HEX);
   }
 
   wdp++;

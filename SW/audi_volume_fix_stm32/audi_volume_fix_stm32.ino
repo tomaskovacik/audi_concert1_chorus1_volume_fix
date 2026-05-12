@@ -114,7 +114,7 @@ struct CircularPacketBuffer {
   volatile uint8_t rdp;  // read packet pointer
   volatile uint8_t wdp;  // write packet pointer
   volatile uint8_t wbp;  // write byte pointer within current write packet
-  volatile uint8_t busy; // ISR-active flag
+  volatile bool busy;    // ISR-active flag
 
   bool available() const { return rdp != wdp; }
 
@@ -128,7 +128,10 @@ struct CircularPacketBuffer {
   }
 
   // Append val at wbp in the current write packet and advance wbp
-  void write(uint8_t val) { buf[PACKET_IDX(wdp, wbp++)] = val; }
+  void write(uint8_t val) {
+    buf[PACKET_IDX(wdp, wbp)] = val;
+    wbp++;
+  }
 
   // Zero-fill remaining bytes in current write packet then advance wdp
   void commit() {
@@ -145,8 +148,8 @@ struct CircularPacketBuffer {
 volatile uint8_t _panel_msg_buf[howmanypackets * howmanybytesinpacket]; // SPI front-panel data
 volatile uint8_t _i2c_data_buf[howmanypackets * howmanybytesinpacket];  // I2C data from MCU
 
-CircularPacketBuffer panel_message = { _panel_msg_buf, 0, 0, 0, 0 }; // SPI front panel messages
-CircularPacketBuffer i2c_data      = { _i2c_data_buf,  0, 0, 0, 0 }; // I2C packets from MCU
+CircularPacketBuffer panel_message = { _panel_msg_buf, 0, 0, 0, false }; // SPI front panel messages
+CircularPacketBuffer i2c_data      = { _i2c_data_buf,  0, 0, 0, false }; // I2C packets from MCU
 
 volatile uint8_t _byte; //temporary, incoming byte is shiffted here, then when we are done grabbing it, it is stored in array each packet alone in one row
 
@@ -1029,7 +1032,7 @@ void disableInteruptOnCLK()
 {
   detachInterrupt(digitalPinToInterrupt(mcuCLK)); //so STATUS is low, so all data are clocked in:
   panel_message.write(_byte); //move data from tempporary variable to array based on pointer of current packet and current byte in packet
-  if (panel_message.wbp == howmanybytesinpacket ) { //this can happend, but it must be last byte in packet, otherwise we will rewrite data in packet row
+  if (panel_message.wbp == howmanybytesinpacket ) { //this can happen, but it must be last byte in packet, otherwise we will rewrite data in packet row
     panel_message.wbp = 0;
 #ifdef USE_SERIAL
     USEDSERIAL.println(F("dwbp overflow"));//put this out, just to know,

@@ -98,22 +98,57 @@ FlexWire SWire = FlexWire(PB11, PB10);
 
 const byte MY_ADDRESS = I2C_7BITADDR;
 
-uint8_t wdp = 0; //write data pointer, data for i2c, going from 0 to howmanypackets
-uint8_t rdp = 0; //read data pointer for i2c comunication, going from 0 to howmanypackets
-uint8_t reading_i2c = 0; //flag indicating that we are busy grabing i2c data, so we should not mess with them in main loop
 /*
-   array for i2c data, size+subaddress+4 (for seting balance and fade ...) I never see more data  so, 8 should be preaty safe...
-   also never see more then 3 packet send one after another, so 6 packets should be ok
-   but also after while, I implemented grabing display data which can be more then 8 like 15-16 bytes per packet
+   CircularPacketBuffer - wraps a flat byte array as a circular queue of fixed-size
+   packets (howmanypackets x howmanybytesinpacket).
+
+   read(dst)  - copy current read packet into dst[] and advance rdp
+   write(val) - append val to the current write packet at wbp and advance wbp
+   commit()   - zero-fill remaining bytes in write packet then advance wdp
+   available()- true when at least one unread packet is waiting
+   busy       - set by ISR while actively writing a packet; main loop must not
+                read while busy is set
 */
-volatile uint8_t data[howmanypackets * howmanybytesinpacket];
+struct CircularPacketBuffer {
+  volatile uint8_t *buf;
+  volatile uint8_t rdp;  // read packet pointer
+  volatile uint8_t wdp;  // write packet pointer
+  volatile uint8_t wbp;  // write byte pointer within current write packet
+  volatile uint8_t busy; // ISR-active flag
+
+  bool available() const { return rdp != wdp; }
+
+  // Copy the current read packet into dst[], clear the slot, then advance rdp
+  void read(uint8_t dst[]) {
+    for (uint8_t i = 0; i < howmanybytesinpacket; i++)
+      dst[i] = buf[PACKET_IDX(rdp, i)];
+    for (uint8_t i = 0; i < howmanybytesinpacket; i++)
+      buf[PACKET_IDX(rdp, i)] = 0;
+    if (++rdp == howmanypackets) rdp = 0;
+  }
+
+  // Append val at wbp in the current write packet and advance wbp
+  void write(uint8_t val) { buf[PACKET_IDX(wdp, wbp++)] = val; }
+
+  // Zero-fill remaining bytes in current write packet then advance wdp
+  void commit() {
+    while (wbp < howmanybytesinpacket) buf[PACKET_IDX(wdp, wbp++)] = 0;
+    wbp = 0;
+    if (++wdp == howmanypackets) wdp = 0;
+  }
+};
+
+/*
+   Flat backing arrays for the two circular packet buffers.
+   Access them only through the panel_message / i2c_data helper objects below.
+*/
+volatile uint8_t _panel_msg_buf[howmanypackets * howmanybytesinpacket]; // SPI front-panel data
+volatile uint8_t _i2c_data_buf[howmanypackets * howmanybytesinpacket];  // I2C data from MCU
+
+CircularPacketBuffer panel_message = { _panel_msg_buf, 0, 0, 0, 0 }; // SPI front panel messages
+CircularPacketBuffer i2c_data      = { _i2c_data_buf,  0, 0, 0, 0 }; // I2C packets from MCU
 
 volatile uint8_t _byte; //temporary, incoming byte is shiffted here, then when we are done grabbing it, it is stored in array each packet alone in one row
-volatile uint8_t _msg[howmanypackets * howmanybytesinpacket]; //here we have array for packet for display
-volatile uint8_t dwdp = 0; //display write data pointer, going from 0 to howmanypackets
-volatile uint8_t dwbp = 0; //display write byte pointer, for each dwdp there is "howmanybytesinpacket" dwbp,  going from to howmanybytesinpacket, we do not need this, cose i2c comunication has exact number of byte per packet ...
-volatile uint8_t grabing_SPI = 0; //flag indicating we are busy grabing front panel display data, so we should not mess with them in main loop
-volatile uint8_t drdp = 0; //display read data pointer for front panel comunication
 
 volatile uint8_t start_volume = 0xBA; //was 0xE4- set it 4leves lower, some complaines from BOSE users .. 
 
@@ -289,26 +324,21 @@ void loop()
     if (!digitalRead(displayRESET) && displayRESETstate) {
        USEDSERIAL.println("Reset LOW");
       displayRESETstate = 0;
-      wdp = rdp = dwdp = drdp = 0;
+      wdp = rdp = dwdp = drdp = 0; // old API; new: i2c_data.wdp = i2c_data.rdp = panel_message.wdp = panel_message.rdp = 0;
       while(!digitalRead(displayRESET)){
         //caled for sleep
         delay(1);
       }
     }
   */
-  if (!grabing_SPI) { //no data are send on SPI line
+  if (!panel_message.busy) { //no data are send on SPI line
 
-    while (drdp != dwdp) { //reading and writing pointers are not in sync, we have some data which should be analyzed
+    while (panel_message.available()) { //reading and writing pointers are not in sync, we have some data which should be analyzed
       //move current reading data from array of packet in separate variable,
       //here should be memcopy, no for ... but... who cares ...
       //or we should just send pointer drdp as function parameter, array with packet is not local ....no I try it and it will use 1% more of program storage space  ...
       uint8_t _data[howmanybytesinpacket];
-      for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
-        _data[i] = _msg[PACKET_IDX(drdp, i)];
-        //#ifdef USE_SERIAL
-        //   USEDSERIAL.print(_data[i],HEX);
-        //#endif
-      }
+      panel_message.read(_data);
       if (_data[0] == 0x25)//button push
       {
 #ifdef USE_SERIAL
@@ -328,22 +358,15 @@ void loop()
       if (_data[0] == 0x9A) { // packet starting with 0x95 is update for pannel, text, indications leds ....
         decode_display_data(_data);
       }
-      drdp++; //after everything increment read pointer
-      if (drdp == howmanypackets) drdp = 0; //reset to zero if we are at top
 
     }
   }
-  if (!reading_i2c) {// not capturing i2c, safe to mess with it
-    while (rdp != wdp) {//reading and writing pointers are not in sync, we have some data which should be analyzed
+  if (!i2c_data.busy) {// not capturing i2c, safe to mess with it
+    while (i2c_data.available()) {//reading and writing pointers are not in sync, we have some data which should be analyzed
       //move current reading data from array of packet in separate variable,
       //here should be memcopy, no for ... but... who cares ...
       uint8_t _data[howmanybytesinpacket];
-      // USEDSERIAL.println(rdp);
-      // USEDSERIAL.println(wdp);
-      for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
-        _data[i] = data[PACKET_IDX(rdp, i)];
-        // USEDSERIAL.print(_data[i],HEX);  USEDSERIAL.print(" ");
-      }
+      i2c_data.read(_data);
       // USEDSERIAL.println();
       // if (!dumpI2cDataAndDoNotFix) {
       if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {//volume was set by panel, and is probably fucked :) , only fixing volume packet, subbaddress = ?
@@ -383,12 +406,6 @@ void loop()
               sendI2C(_data);
             }*/
 
-
-      for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
-        data[PACKET_IDX(rdp, i)] = 0;
-      }
-      rdp++;
-      if (rdp == howmanypackets) rdp = 0;
     }
     //       USEDSERIAL.print(F("wdp: ");  USEDSERIAL.print(wdp);  USEDSERIAL.print(F(" rdp ");  USEDSERIAL.println(rdp);
   }
@@ -994,20 +1011,15 @@ void enableInteruptOnCLK()
     detachInterrupt(digitalPinToInterrupt(mcuSTATUS)); //we need  to do this, cose otherwise it's doing strange things
 
     //CLK is HIGH, this is end of  packet
-    while (dwbp < howmanybytesinpacket) { //clean array from current write pointer to end of packet
-      _msg[PACKET_IDX(dwdp, dwbp++)] = 0;
-    }
-    dwbp = 0; //set byte write pointer to begining
-    dwdp++; //increment write pointer
-    if (dwdp == howmanypackets) dwdp = 0; //if we reach last+1 position in array for packet, go back to 0
+    panel_message.commit(); //zero-fill remaining bytes and advance write pointer
     attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING); //enable this interrupt again, with same parameters
     //after this interupt is still set to rising on STATUS line,
-    grabing_SPI = 0;//we are safe to manipulate data in main loop, I just move this from disableInteruptOnCLK function
+    panel_message.busy = 0;//we are safe to manipulate data in main loop, I just move this from disableInteruptOnCLK function
   } else {
     //clk is low, start of packet
     attachInterrupt(digitalPinToInterrupt(mcuSTATUS), disableInteruptOnCLK, FALLING); //seting falling interupt on STATE line, indicating end of byte transfer
     _byte = 0; //new data, zeroing temporary variable used to clock in data , just to be sure
-    grabing_SPI = 1;//set grabit flag to avoid messing with live packet data in main loop
+    panel_message.busy = 1;//set grabit flag to avoid messing with live packet data in main loop
     attachInterrupt(digitalPinToInterrupt(mcuCLK), readCLK, RISING); //enabling interupt on CLK like, to grab data after each fire of this int routine
   }
 }
@@ -1016,9 +1028,9 @@ void enableInteruptOnCLK()
 void disableInteruptOnCLK()
 {
   detachInterrupt(digitalPinToInterrupt(mcuCLK)); //so STATUS is low, so all data are clocked in:
-  _msg[PACKET_IDX(dwdp, dwbp++)] = _byte; //move data from tempporary variable to array based on pointer of current packet and current byte in packet
-  if (dwbp == howmanybytesinpacket ) { //this can happend, but it must be last byte in packet, otherwise we will rewrite data in packet row
-    dwbp = 0;
+  panel_message.write(_byte); //move data from tempporary variable to array based on pointer of current packet and current byte in packet
+  if (panel_message.wbp == howmanybytesinpacket ) { //this can happend, but it must be last byte in packet, otherwise we will rewrite data in packet row
+    panel_message.wbp = 0;
 #ifdef USE_SERIAL
     USEDSERIAL.println(F("dwbp overflow"));//put this out, just to know,
 #endif
@@ -1043,18 +1055,14 @@ void readCLK()
 // called by interrupt service routine when incoming data arrives
 void receiveEvent (int howMany)
 {
-  // USEDSERIAL.print(F("grabing i2c: wdp: "));  USEDSERIAL.print(wdp);//  USEDSERIAL.print(F(" howmany: ");  USEDSERIAL.println(howMany);
-  reading_i2c = 1;
-  data[PACKET_IDX(wdp, 0)] = howMany;
+  // USEDSERIAL.print(F("grabing i2c: wdp: "));  USEDSERIAL.print(i2c_data.wdp);//  USEDSERIAL.print(F(" howmany: ");  USEDSERIAL.println(howMany);
+  i2c_data.busy = 1;
+  i2c_data.write(howMany);
   for (uint8_t i = 0; i < howMany; i++) {
-
-    data[PACKET_IDX(wdp, i + 1)] = Wire.read();
-    // USEDSERIAL.print(data[PACKET_IDX(wdp, i + 1)], HEX);
+    i2c_data.write(Wire.read());
   }
-
-  wdp++;
-  if (wdp == howmanypackets) wdp = 0;
-  reading_i2c = 0;
+  i2c_data.commit();
+  i2c_data.busy = 0;
 }  // end of receiveEvent
 
 

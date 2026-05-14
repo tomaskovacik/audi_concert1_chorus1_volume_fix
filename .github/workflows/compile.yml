@@ -21,6 +21,5 @@ jobs:
               source-url: https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json
           libraries: |
             - name: FlexWire
-            - name: Wire_slave
           sketch-paths: |
             - SW/audi_volume_fix_stm32

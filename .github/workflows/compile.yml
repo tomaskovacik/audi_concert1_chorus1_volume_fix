@@ -17,8 +17,10 @@ jobs:
         with:
           fqbn: "stm32duino:STM32F1:genericSTM32F103C"
           platforms: |
+            - name: arduino:sam
             - name: stm32duino:STM32F1
-              source-url: https://raw.githubusercontent.com/rogerclarkmelbourne/Arduino_STM32/master/package_STM32duino_index.json
+              source-url: https://github.com/rogerclarkmelbourne/Arduino_STM32.git
+              source-path: STM32F1
           libraries: |
             - name: FlexWire
           sketch-paths: |

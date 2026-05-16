@@ -3,7 +3,7 @@
 // HWv3 with #define HWV3
 // HWv4 with #define HWV4
 // HWv5 with #define HWV5
-// module is hold in reseted state when fron panel is off, no last volume is stored ... 
+// module is held in reset state when front panel is off, no last volume is stored ...
 //#include <Wire.h>
 
 //#define HWV3
@@ -28,10 +28,10 @@ FlexWire SWire = FlexWire(PB11, PB10);
 
 //#define USE_SERIAL
 //use Serial for medium-high density devices like stm32F103C8/B
-//user Serial1 for low densty devices like stm32f103c6
+//use Serial1 for low-density devices like stm32f103c6
 #define USEDSERIAL Serial1
 /*
-    SPI comunication between motorola MC68HC05B32 cpu to front panel ST6280
+    SPI communication between motorola MC68HC05B32 cpu to front panel ST6280
     basics:
     SPI MODE 0
 
@@ -39,12 +39,12 @@ FlexWire SWire = FlexWire(PB11, PB10);
     STATUS idle high, it's like CS but it's triggered by slave here)
     DATA idle high
 
-    comunication principle:
+    communication principle:
     CLK line going LOW is signaling someone wanna talk
     whatever it's slave (panel, cose we have buttons there ...) or master
     after CLK is low, slave bring STATE line LOW, and when he is ready to
     receive data he will bring STATE HIGH, then master will clock out data
-    or clock in data, after everything is transmited, CLOCK goes HIGH and
+    or clock in data, after everything is transmitted, CLOCK goes HIGH and
     shortly after this STATE goes HIGH signaling end of packet.
     While CLK is still low after STATE goes LOW, signaling there is probably
     more data to come.
@@ -89,32 +89,32 @@ FlexWire SWire = FlexWire(PB11, PB10);
 //TwoWire Wire(PB9,PB8, SOFT_STANDARD);
 //SoftWire SWire(PB10, PB11, SOFT_FAST);
 
-//we are trying to interface with comunication to TDA7342 which is 0x44 so...
+//we are trying to interface with communication to TDA7342 which is 0x44 so...
 #define I2C_7BITADDR 0x44
-//array is klasik byte howmanypackets X howmanybytesinpacket
+//array is classic byte howmanypackets X howmanybytesinpacket
 #define howmanypackets 20
 #define howmanybytesinpacket 15
 
 const byte MY_ADDRESS = I2C_7BITADDR;
 
 uint8_t wdp = 0; //write data pointer, data for i2c, going from 0 to howmanypackets
-uint8_t rdp = 0; //read data pointer for i2c comunication, going from 0 to howmanypackets
-uint8_t reading_i2c = 0; //flag indicating that we are busy grabing i2c data, so we should not mess with them in main loop
+uint8_t rdp = 0; //read data pointer for i2c communication, going from 0 to howmanypackets
+uint8_t reading_i2c = 0; //flag indicating that we are busy grabbing i2c data, so we should not mess with them in main loop
 /*
-   array for i2c data, size+subaddress+4 (for seting balance and fade ...) I never see more data  so, 8 should be preaty safe...
+   array for i2c data, size+subaddress+4 (for setting balance and fade ...) I never see more data  so, 8 should be pretty safe...
    also never see more then 3 packet send one after another, so 6 packets should be ok
-   but also after while, I implemented grabing display data which can be more then 8 like 15-16 bytes per packet
+   but also after while, I implemented grabbing display data which can be more then 8 like 15-16 bytes per packet
 */
 volatile uint8_t data[howmanypackets][howmanybytesinpacket];
 
-volatile uint8_t _byte; //temporary, incoming byte is shiffted here, then when we are done grabbing it, it is stored in array each packet alone in one row
+volatile uint8_t _byte; //temporary, incoming byte is shifted here, then when we are done grabbing it, it is stored in array each packet alone in one row
 volatile uint8_t _msg[howmanypackets][howmanybytesinpacket]; //here we have array for packet for display
 volatile uint8_t dwdp = 0; //display write data pointer, going from 0 to howmanypackets
-volatile uint8_t dwbp = 0; //display write byte pointer, for each dwdp there is "howmanybytesinpacket" dwbp,  going from to howmanybytesinpacket, we do not need this, cose i2c comunication has exact number of byte per packet ...
-volatile uint8_t grabing_SPI = 0; //flag indicating we are busy grabing front panel display data, so we should not mess with them in main loop
-volatile uint8_t drdp = 0; //display read data pointer for front panel comunication
+volatile uint8_t dwbp = 0; //display write byte pointer, for each dwdp there is "howmanybytesinpacket" dwbp,  going from to howmanybytesinpacket, we do not need this, cose i2c communication has exact number of byte per packet ...
+volatile uint8_t grabbing_SPI = 0; //flag indicating we are busy grabbing front panel display data, so we should not mess with them in main loop
+volatile uint8_t drdp = 0; //display read data pointer for front panel communication
 
-volatile uint8_t start_volume = 0xBA; //was 0xE4- set it 4leves lower, some complaines from BOSE users .. 
+volatile uint8_t start_volume = 0xBA; //was 0xE4- set it 4leves lower, some complaints from BOSE users ..
 
 volatile uint8_t volume = start_volume; //set start volume here ...
 volatile uint8_t current_volume = start_volume; //set start volume here ..
@@ -156,49 +156,49 @@ void set_volume();
 void set_loudness();
 
 /*
-   calculate speaker attuenations, cose we are calculating this for each speaker, so I make fction to avoid long code...
+   calculate speaker attenuations, cose we are calculating this for each speaker, so I made a function to avoid long code...
 */
 void spk_atten(uint8_t c);
 
 /*
-   RISING interupt on STATE line
-   it enable RISING interupt on CLK line to grab data on dataline when fired
-   this one also change interupt on STATE line to FALLING
+   RISING interrupt on STATE line
+   it enable RISING interrupt on CLK line to grab data on dataline when fired
+   this one also change interrupt on STATE line to FALLING
 
    first after fired, we check if CLK is LOW or HIGH:
 
    if HIGH - indicating end of packet:
-            immediatly detach this interrupt, without this  it was acting strangely
-            change rest of packet in arary to zero so there is no junc from previous comunication (or should I zeroed it before? nooooo  here we have lot of time, cose we are at end of packet \o/
+            immediately detach this interrupt, without this  it was acting strangely
+            change rest of packet in array to zero so there is no junk from previous communication (or should I zero it before? nooooo  here we have lot of time, cose we are at end of packet \o/
             set display byte pointer to 0
-            increment dispay write pointer
-            again attach same interupt RISING on STATE line
+            increment display write pointer
+            again attach same interrupt RISING on STATE line
 
    if LOW - we are going to receive data/more data - next byte in packet
-            enabling FALLING interupt on STATE line
-            zeroing _byte variable, just in case, we should not need this, cose ther should be 8 runs of CLK pulses, so it should overflow all old data .... but just in case we are doing it
-            seting grabing_SPI flag
-            enabling RISING interupt on CLK line
+            enabling FALLING interrupt on STATE line
+            zeroing _byte variable, just in case, we should not need this, cose there should be 8 runs of CLK pulses, so it should overflow all old data .... but just in case we are doing it
+            setting grabbing_SPI flag
+            enabling RISING interrupt on CLK line
 */
-void enableInteruptOnCLK();
+void enableInterruptOnCLK();
 
 /*
 
-    fired when STATE goes LOW, disale any CLK interupt, and enable RISING interupt on STATE line
+    fired when STATE goes LOW, disable any CLK interrupt, and enable RISING interrupt on STATE line
 
 */
-void disableInteruptOnCLK();
+void disableInterruptOnCLK();
 
 /*
 
-   function to grabing data if CLK goes HIGH
+   function to grab data if CLK goes HIGH
 
 */
 void readCLK();
 
 /*
 
-   clasic setup function
+   classic setup function
 
 */
 #ifdef USE_SERIAL
@@ -210,8 +210,8 @@ void set_unmute();
 
 void setup ()
 {
-  //PB3 works inly in this is called
-  //enableDebugPorts(); //required if not USB upload is used, for example pure STLINK or serial upload - perfect for lowdensity devices (103C6 4exmaple)
+  //PB3 works only if this is called
+  //enableDebugPorts(); //required if not USB upload is used, for example pure STLINK or serial upload - perfect for low-density devices (103C6 for example)
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;
   volume_packet[1] = 0x02;
@@ -228,11 +228,11 @@ void setup ()
   //  }
   //init pins for display SPI
   pinMode(mcuSTATUS, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING);
+  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInterruptOnCLK, RISING);
   pinMode(mcuCLK, INPUT_PULLUP);
   pinMode(mcuDATA, INPUT_PULLUP);
   pinMode(displayRESET, INPUT);
-  //init interrupt on STATUS line to grab data send betwen display and main CPU
+  //init interrupt on STATUS line to grab data sent between display and main CPU
 
   //serial for debug
 #ifdef USE_SERIAL
@@ -295,7 +295,7 @@ void loop()
       }
     }
   */
-  if (!grabing_SPI) { //no data are send on SPI line
+  if (!grabbing_SPI) { //no data are send on SPI line
 
     while (drdp != dwdp) { //reading and writing pointers are not in sync, we have some data which should be analyzed
       //move current reading data from array of packet in separate variable,
@@ -314,17 +314,17 @@ void loop()
         decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
 #endif
         //if (!dumpI2cDataAndDoNotFix) {
-        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) { //volume nob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
+        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) { //volume knob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
           set_volume_up();
           set_volume();
         }
-        if (grab_volume == 1 &&  (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) { //some as previous but nob goes down
+        if (grab_volume == 1 &&  (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) { //same as previous but knob goes down
           set_volume_down();
           set_volume();
         }
         //}
       }
-      if (_data[0] == 0x9A) { // packet starting with 0x95 is update for pannel, text, indications leds ....
+      if (_data[0] == 0x9A) { // packet starting with 0x95 is update for panel, text, indications leds ....
         decode_display_data(_data);
       }
       drdp++; //after everything increment read pointer
@@ -477,7 +477,7 @@ void set_volume_up() {
   } else if (volume > 0x10) {
     volume = 0x10;
   }
-  if (volume < 0x10) volume = 0x10; //top volume, seen on original comunication was never less then 0x10
+  if (volume < 0x10) volume = 0x10; //top volume, seen on original communication was never less then 0x10
 }
 
 void set_volume_down() {
@@ -986,8 +986,8 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 
 
 
-//enable RISING interupt on CLK line when STATUS line RISED
-void enableInteruptOnCLK()
+//enable RISING interrupt on CLK line when STATUS line rises
+void enableInterruptOnCLK()
 {
   if (digitalRead(mcuCLK)) {
     detachInterrupt(digitalPinToInterrupt(mcuSTATUS)); //we need  to do this, cose otherwise it's doing strange things
@@ -996,34 +996,34 @@ void enableInteruptOnCLK()
     while (dwbp < howmanybytesinpacket) { //clean array from current write pointer to end of packet
       _msg[dwdp][dwbp++] = 0;
     }
-    dwbp = 0; //set byte write pointer to begining
+    dwbp = 0; //set byte write pointer to beginning
     dwdp++; //increment write pointer
     if (dwdp == howmanypackets) dwdp = 0; //if we reach last+1 position in array for packet, go back to 0
-    attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING); //enable this interrupt again, with same parameters
-    //after this interupt is still set to rising on STATUS line,
-    grabing_SPI = 0;//we are safe to manipulate data in main loop, I just move this from disableInteruptOnCLK function
+    attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInterruptOnCLK, RISING); //enable this interrupt again, with same parameters
+    //after this interrupt is still set to rising on STATUS line,
+    grabbing_SPI = 0;//we are safe to manipulate data in main loop, I just move this from disableInterruptOnCLK function
   } else {
     //clk is low, start of packet
-    attachInterrupt(digitalPinToInterrupt(mcuSTATUS), disableInteruptOnCLK, FALLING); //seting falling interupt on STATE line, indicating end of byte transfer
+    attachInterrupt(digitalPinToInterrupt(mcuSTATUS), disableInterruptOnCLK, FALLING); //setting falling interrupt on STATE line, indicating end of byte transfer
     _byte = 0; //new data, zeroing temporary variable used to clock in data , just to be sure
-    grabing_SPI = 1;//set grabit flag to avoid messing with live packet data in main loop
-    attachInterrupt(digitalPinToInterrupt(mcuCLK), readCLK, RISING); //enabling interupt on CLK like, to grab data after each fire of this int routine
+    grabbing_SPI = 1;//set grabbing flag to avoid messing with live packet data in main loop
+    attachInterrupt(digitalPinToInterrupt(mcuCLK), readCLK, RISING); //enabling interrupt on CLK line, to grab data after each fire of this int routine
   }
 }
 
-//disable CLK interupt while STATUS is low
-void disableInteruptOnCLK()
+//disable CLK interrupt while STATUS is low
+void disableInterruptOnCLK()
 {
   detachInterrupt(digitalPinToInterrupt(mcuCLK)); //so STATUS is low, so all data are clocked in:
   _msg[dwdp][dwbp++] = _byte; //move data from tempporary variable to array based on pointer of current packet and current byte in packet
-  if (dwbp == howmanybytesinpacket ) { //this can happend, but it must be last byte in packet, otherwise we will rewrite data in packet row
+  if (dwbp == howmanybytesinpacket ) { //this can happen, but it must be last byte in packet, otherwise we will rewrite data in packet row
     dwbp = 0;
 #ifdef USE_SERIAL
     USEDSERIAL.println(F("dwbp overflow"));//put this out, just to know,
 #endif
   }
-  //grabing_SPI = 0;//we are safe to manipulate data in main loop, I just move this to enableInteruptOnCLK function to part wich indicate end of packet transfer
-  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInteruptOnCLK, RISING);// enable RISING interupt on STATE line, indicating start of transmition of data
+  //grabbing_SPI = 0;//we are safe to manipulate data in main loop, I just move this to enableInterruptOnCLK function to part which indicate end of packet transfer
+  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInterruptOnCLK, RISING);// enable RISING interrupt on STATE line, indicating start of transmission of data
 }
 
 void readCLK()
@@ -1042,7 +1042,7 @@ void readCLK()
 // called by interrupt service routine when incoming data arrives
 void receiveEvent (int howMany)
 {
-  // USEDSERIAL.print(F("grabing i2c: wdp: "));  USEDSERIAL.print(wdp);//  USEDSERIAL.print(F(" howmany: ");  USEDSERIAL.println(howMany);
+  // USEDSERIAL.print(F("grabbing i2c: wdp: "));  USEDSERIAL.print(wdp);//  USEDSERIAL.print(F(" howmany: ");  USEDSERIAL.println(howMany);
   reading_i2c = 1;
   data[wdp][0] = howMany;
   for (uint8_t i = 0; i < howMany; i++) {

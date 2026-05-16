@@ -15,10 +15,10 @@ jobs:
       - name: Compile sketch
         uses: arduino/compile-sketches@v1
         with:
-          fqbn: "STMicroelectronics:stm32:GenF1:pnum=BLUEPILL_F103C8"
+          fqbn: "stm32duino:STM32F1:genericSTM32F103C"
           platforms: |
-            - name: STMicroelectronics:stm32
-              source-url: https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json
+            - name: stm32duino:STM32F1
+              source-url: https://raw.githubusercontent.com/rogerclarkmelbourne/Arduino_STM32/master/package_STM32duino_index.json
           libraries: |
             - name: FlexWire
           sketch-paths: |

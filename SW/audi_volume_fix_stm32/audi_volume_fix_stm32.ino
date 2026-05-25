@@ -10,11 +10,10 @@
 //#define HWV4
 
 
-/* version 5
+/* version 5 — passive sniffer (same role as HWv1-v4, CLK/DATA via SPI1 peripheral)
 mcuCLK    = PA5  (SPI1_SCK  - input, MCU drives CLK)
-mcuDATA   = PA7  (SPI1_MOSI - input, MCU drives DATA)
-mcuSTATUS = PA15 (output, STM32 drives STATUS acting as panel)
-mcuCS     = PA3  (output, hardware-inverted PA15)
+mcuDATA   = PA7  (SPI1_MOSI - input, shared DATA via resistors)
+mcuSTATUS = PA15 (input, panel drives STATUS)
 */
 #define HWV5
 
@@ -30,7 +29,7 @@ FlexWire SWire = FlexWire(PB11, PB10);
 
 //TwoWire Swire = TwoWire(PB11, PB10);
 
-//#define USE_SERIAL
+#define USE_SERIAL
 //use Serial for medium-high density devices like stm32F103C8/B
 //use Serial1 for low-density devices like stm32f103c6
 #define USEDSERIAL Serial1
@@ -61,9 +60,8 @@ FlexWire SWire = FlexWire(PB11, PB10);
 //#define displayRESET 8
 //STM32
 #ifdef HWV5
-#define mcuCLK    PA5  // SPI1_SCK  - MCU drives CLK
-#define mcuDATA   PA7  // SPI1_MOSI - MCU drives DATA (was PA6 in HWv4 bit-bang mode)
-#define mcuCS     PA3  // output: hardware-inverted PA15 (mirrors !STATUS)
+#define mcuCLK    PA5  // SPI1_SCK  - MCU drives CLK (input, passive sniff)
+#define mcuDATA   PA7  // SPI1_MOSI - shared DATA via resistors (input, passive sniff)
 #else
 #define mcuCLK PB3 //CLK
 #define mcuDATA PB4//DATA
@@ -271,23 +269,19 @@ void setup ()
   //    volume_packet[i] = 0;
   //    loudness_packet[i] = 0;
   //  }
-  // HWV5: SPI1 slave — STM32 acts as front panel toward the Audi radio MCU.
-  // MCU drives CLK; we drive STATUS in response (standard SPI slave handshake).
-  pinMode(mcuCLK, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(mcuCLK), mcuClkChange, CHANGE);
-  pinMode(mcuDATA, INPUT_PULLUP);    // SPI1_MOSI
-  pinMode(mcuSTATUS, OUTPUT);        // we drive STATUS (panel role)
-  digitalWrite(mcuSTATUS, HIGH);     // idle HIGH
-  pinMode(mcuCS, OUTPUT);            // PA3: hw-inverted PA15
-  digitalWrite(mcuCS, LOW);          // STATUS HIGH → CS LOW
-  SPI.begin();                       // configure PA5/PA6/PA7 as SPI1 AF pins
+  // HWV5: SPI1 slave — passive sniffer on the shared CLK/DATA bus.
+  // MCU drives CLK and DATA; panel drives STATUS; we only observe.
+  pinMode(mcuSTATUS, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInterruptOnCLK, RISING);
+  SPI.begin();                        // enable SPI1 clock and basic AF pin init
   SPI1->regs->CR1 &= ~SPI_CR1_SPE;
-  SPI1->regs->CR1 &= ~SPI_CR1_MSTR; // slave mode
-  SPI1->regs->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI; // software NSS; CPOL=0 CPHA=0 (MODE 0)
+  SPI1->regs->CR1 &= ~SPI_CR1_MSTR;  // slave mode
+  SPI1->regs->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI; // software NSS, always selected; MODE 0
   SPI1->regs->CR1 |= SPI_CR1_SPE;
-  SPI1->regs->DR   = 0x00;          // pre-load MISO idle value
   SPI1->regs->CR2 |= SPI_CR2_RXNEIE; // fire __irq_spi1 on each received byte
   nvic_irq_enable(NVIC_SPI1);
+  pinMode(mcuCLK, INPUT_PULLUP);      // PA5: SPI.begin() sets AF_OUTPUT_PP; restore INPUT
+  pinMode(mcuDATA, INPUT_PULLUP);     // PA7: SPI.begin() sets AF_OUTPUT_PP; restore INPUT
   pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data sent between display and main CPU
 
@@ -1028,43 +1022,14 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 
 
 
-// ── HWV5 SPI1 slave ISRs ────────────────────────────────────────────────────
-// CLK FALLING: MCU starts a byte; we toggle STATUS LOW→HIGH (slave ready).
-// CLK RISING:  End of packet; close the panel_message packet.
-// SPI1 RXNE:   Byte fully shifted in; store it and toggle STATUS (byte done).
+// ── HWV5 SPI1 RXNE ISR — passive sniffer ────────────────────────────────────
+// SPI1 fires when a byte is fully shifted in from the CLK/DATA bus.
+// Store it in _byte; disableInterruptOnCLK() picks it up on STATUS FALLING.
 #ifdef HWV5
-void mcuClkChange()
-{
-    if (!digitalRead(mcuCLK)) {
-        panel_message.busy = 1;
-        digitalWrite(mcuCS, HIGH);
-        digitalWrite(mcuSTATUS, LOW);
-        digitalWrite(mcuSTATUS, HIGH);
-        digitalWrite(mcuCS, LOW);
-        if (SPI1->regs->SR & SPI_SR_RXNE) (void)SPI1->regs->DR; // flush stale byte
-    } else {
-        if (SPI1->regs->SR & SPI_SR_RXNE)
-            panel_message.write((uint8_t)SPI1->regs->DR);
-        panel_message.commit();
-        panel_message.busy = 0;
-        digitalWrite(mcuSTATUS, HIGH);
-        digitalWrite(mcuCS, LOW);
-    }
-}
-
-inline void spi1ByteReceived()
-{
-    panel_message.write((uint8_t)SPI1->regs->DR);
-    SPI1->regs->DR = 0x00;
-    digitalWrite(mcuCS, HIGH);
-    digitalWrite(mcuSTATUS, LOW);
-    digitalWrite(mcuSTATUS, HIGH);
-    digitalWrite(mcuCS, LOW);
-}
-
 extern "C" void __irq_spi1(void)
 {
-    if (SPI1->regs->SR & SPI_SR_RXNE) spi1ByteReceived();
+    if (SPI1->regs->SR & SPI_SR_RXNE)
+        _byte = (uint8_t)SPI1->regs->DR;
 }
 #endif // HWV5
 
@@ -1085,14 +1050,23 @@ void enableInterruptOnCLK()
     attachInterrupt(digitalPinToInterrupt(mcuSTATUS), disableInterruptOnCLK, FALLING); //setting falling interrupt on STATE line, indicating end of byte transfer
     _byte = 0; //new data, zeroing temporary variable used to clock in data , just to be sure
     panel_message.busy = 1;//set grabit flag to avoid messing with live packet data in main loop
+#ifdef HWV5
+    // Reset SPI1 shift register so it aligns on the next byte's 8 CLK edges
+    SPI1->regs->CR1 &= ~SPI_CR1_SPE;
+    if (SPI1->regs->SR & SPI_SR_RXNE) (void)SPI1->regs->DR;
+    SPI1->regs->CR1 |= SPI_CR1_SPE;
+#else
     attachInterrupt(digitalPinToInterrupt(mcuCLK), readCLK, RISING); //enabling interupt on CLK like, to grab data after each fire of this int routine
+#endif
   }
 }
 
 //disable CLK interrupt while STATUS is low
 void disableInterruptOnCLK()
 {
+#ifndef HWV5
   detachInterrupt(digitalPinToInterrupt(mcuCLK)); //so STATUS is low, so all data are clocked in:
+#endif
   panel_message.write(_byte); //move data from tempporary variable to array based on pointer of current packet and current byte in packet
   if (panel_message.wbp == howmanybytesinpacket ) { //this can happen, but it must be last byte in packet, otherwise we will rewrite data in packet row
     panel_message.wbp = 0;
@@ -1134,7 +1108,7 @@ void receiveEvent (int howMany)
 
 void sendI2C (uint8_t data[howmanybytesinpacket]) {
 #ifdef USE_SERIAL
-  decode_i2c(data);
+ // decode_i2c(data);
 #endif
   //  int timeout_us = 5000;
   //  while (!i2c_start((I2C_7BITADDR << 1) | I2C_WRITE) && timeout_us > 0) {

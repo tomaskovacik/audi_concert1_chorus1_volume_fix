@@ -5,6 +5,7 @@
 mcuCLK    = PA5  (SPI1_SCK  - input, MCU drives CLK)
 mcuDATA   = PA7  (SPI1_MOSI - input, shared DATA via resistors)
 mcuSTATUS = PA15 (input, panel drives STATUS)
+GALA      = PA0  (input, speed pulse from vehicle — optional feature)
 */
 #include <SPI.h>
 #include <Wire_slave.h>
@@ -16,6 +17,32 @@ FlexWire SWire = FlexWire(PB11, PB10);
 
 #define USE_SERIAL
 #define USEDSERIAL Serial1
+
+// ── Config flash storage ───────────────────────────────────────────────────
+// STM32F103C6 = 32KB flash. Reserve the last 1KB page for config.
+// We only write on explicit serial command so no wear-levelling needed.
+#define CFG_FLASH_PAGE  ((uint32_t)(0x08000000u + 32u*1024u - 1u*1024u))  // 0x8007C00
+#define CFG_MAGIC0  0xA5u
+#define CFG_MAGIC1  0x5Au
+#define CFG_MAGIC2  0xC3u
+
+// Raw flash write/erase API (part of the EEPROM library in Roger Clark core)
+#include "flash_stm32.h"
+
+struct Config {
+  uint8_t magic[3];  // CFG_MAGIC0/1/2
+  uint8_t vol;       // start volume level 1-5  (1=quietest, 5=loudest default=3)
+  uint8_t gala;      // GALA level: 0=off, 1-5 (5=most aggressive speed-volume)
+  uint8_t ta;        // reserved (traffic announcement volume bump, future use)
+  uint8_t crc;       // vol+gala+ta checksum
+};
+
+#define DEFAULT_VOL   3
+#define DEFAULT_GALA  0   // GALA off by default
+#define DEFAULT_TA    3
+
+// GALA speed input pin (PA0 = free pin on HWv5)
+#define GALA_PIN  PA0
 /*
     SPI communication between motorola MC68HC05B32 cpu to front panel ST6280
     basics:
@@ -41,7 +68,7 @@ FlexWire SWire = FlexWire(PB11, PB10);
 #define mcuCS     PA3  // output: mirrors STATUS → HW inverter → SPI1_NSS (PA4)
 #define mcuSTATUS PA15
 #define displayRESET PB8
-#define VERSION "2.0-25.05.26-HWv5"
+#define VERSION "2.1-25.05.26-HWv5"
 
 //we are trying to interface with communication to TDA7342 which is 0x44 so...
 #define I2C_7BITADDR 0x44
@@ -123,6 +150,13 @@ volatile uint8_t grab_volume = 1;
 volatile bool mute = false;
 volatile bool in_volume_recalc = false;
 
+// GALA state
+volatile uint16_t gala_captime = 0;  // pulse width in µs (filled by ISR)
+uint16_t gala_prev_speed = 0;
+
+// displayRESET edge tracking
+uint8_t displayRESETstate = 0;
+
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
@@ -137,8 +171,67 @@ void set_mute();
 void set_unmute();
 void receiveEvent(int howMany);
 
+// ── Config (raw flash, 1KB page) ──────────────────────────────────────────
+
+static Config readConfig() {
+  const Config *p = (const Config *)CFG_FLASH_PAGE;
+  Config c = *p;
+  if (c.magic[0] == CFG_MAGIC0 && c.magic[1] == CFG_MAGIC1 && c.magic[2] == CFG_MAGIC2
+      && c.crc == (uint8_t)(c.vol + c.gala + c.ta))
+    return c;
+  // defaults
+  c.magic[0] = CFG_MAGIC0; c.magic[1] = CFG_MAGIC1; c.magic[2] = CFG_MAGIC2;
+  c.vol  = DEFAULT_VOL;
+  c.gala = DEFAULT_GALA;
+  c.ta   = DEFAULT_TA;
+  c.crc  = c.vol + c.gala + c.ta;
+  return c;
+}
+
+static bool writeConfig(Config c) {
+  c.magic[0] = CFG_MAGIC0; c.magic[1] = CFG_MAGIC1; c.magic[2] = CFG_MAGIC2;
+  c.crc = c.vol + c.gala + c.ta;
+  FLASH_Unlock();
+  FLASH_ErasePage(CFG_FLASH_PAGE);
+  const uint16_t *src = (const uint16_t *)&c;
+  uint32_t addr = CFG_FLASH_PAGE;
+  for (uint8_t i = 0; i < (sizeof(Config) + 1) / 2; i++, addr += 2)
+    if (FLASH_ProgramHalfWord(addr, src[i]) != FLASH_COMPLETE) { FLASH_Lock(); return false; }
+  FLASH_Lock();
+  return true;
+}
+
+static uint8_t volLevelToHex(uint8_t level) {
+  // levels 1-5 → volume hex (higher = quieter on TDA7342)
+  static const uint8_t tbl[] = { 0x56, 0x52, 0x4E, 0x4A, 0x46 };
+  if (level < 1) level = 1;
+  if (level > 5) level = 5;
+  return tbl[level - 1];
+}
+
+// ── GALA ISRs ─────────────────────────────────────────────────────────────
+
+void galaRising() {
+  Timer2.setCount(0);
+  Timer2.resume();
+  attachInterrupt(digitalPinToInterrupt(GALA_PIN), galaFalling, FALLING);
+}
+
+void galaFalling() {
+  Timer2.pause();
+  gala_captime = Timer2.getCount();
+  attachInterrupt(digitalPinToInterrupt(GALA_PIN), galaRising, RISING);
+}
+
 void setup ()
 {
+  // Load config from flash and apply start volume
+  Config cfg = readConfig();
+  start_volume = volLevelToHex(cfg.vol);
+  volume = start_volume;
+  current_volume = start_volume;
+  saved_volume = start_volume;
+
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;
   volume_packet[1] = 0x02;
@@ -175,6 +268,16 @@ void setup ()
 
   pinMode(displayRESET, INPUT);
 
+  // GALA: Timer2 at 1µs resolution for speed pulse measurement
+  if (cfg.gala > 0) {
+    pinMode(GALA_PIN, INPUT_PULLUP);
+    Timer2.setPrescaleFactor(72);  // 72MHz / 72 = 1MHz = 1µs ticks
+    Timer2.setOverflow(0xFFFF);
+    Timer2.pause();
+    Timer2.setCount(0);
+    attachInterrupt(digitalPinToInterrupt(GALA_PIN), galaRising, RISING);
+  }
+
 #ifdef USE_SERIAL
   USEDSERIAL.begin(115200);
   printInfo();
@@ -184,20 +287,65 @@ void setup ()
 }  // end of setup
 
 void printInfo() {
+  Config cfg = readConfig();
   USEDSERIAL.print(F("Firmware version: "));
   USEDSERIAL.println(F(VERSION));
   USEDSERIAL.println(F("(C) kovo, GPL3"));
   USEDSERIAL.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
   USEDSERIAL.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
+  USEDSERIAL.print(F("Start volume level (s1-s5): ")); USEDSERIAL.println(cfg.vol);
+  USEDSERIAL.print(F("GALA level (g0-g5, 0=off):  ")); USEDSERIAL.println(cfg.gala);
+  if (cfg.gala > 0) {
+    USEDSERIAL.print(F("  GALA speed threshold: "));
+    USEDSERIAL.print(100 - (cfg.gala - 1) * 15);
+    USEDSERIAL.println(F(" km/h base"));
+  }
 }
 
 void loop()
 {
 #ifdef USE_SERIAL
-  if (Serial.available()) {
-    if (Serial.read() == 'v') printInfo();
+  if (USEDSERIAL.available()) {
+    char ch = USEDSERIAL.read();
+    Config cfg = readConfig();
+    bool changed = false;
+    if (ch == 'v' || ch == 'V' || ch == 'h' || ch == 'H' || ch == '?') {
+      printInfo();
+    } else if (ch == 's' && USEDSERIAL.available()) {
+      uint8_t lvl = USEDSERIAL.read() - '0';
+      if (lvl >= 1 && lvl <= 5) { cfg.vol = lvl; changed = true; }
+    } else if (ch == 'g' && USEDSERIAL.available()) {
+      uint8_t lvl = USEDSERIAL.read() - '0';
+      if (lvl <= 5) { cfg.gala = lvl; changed = true; }
+    }
+    if (changed) {
+      if (writeConfig(cfg)) {
+        USEDSERIAL.println(F("Config saved. Restart to apply."));
+      } else {
+        USEDSERIAL.println(F("Config write FAILED."));
+      }
+      printInfo();
+    }
   }
 #endif
+
+  // displayRESET edge: reload start volume from config when radio panel wakes up
+  uint8_t rst = digitalRead(displayRESET);
+  if (rst && !displayRESETstate) {
+    displayRESETstate = 1;
+    Config cfg = readConfig();
+    start_volume = volLevelToHex(cfg.vol);
+    volume = start_volume;
+    current_volume = start_volume;
+    saved_volume = start_volume;
+#ifdef USE_SERIAL
+    USEDSERIAL.println(F("Reset HIGH — reloaded start volume"));
+#endif
+  }
+  if (!rst && displayRESETstate) {
+    displayRESETstate = 0;
+  }
+
   if (!panel_message.busy) {
     while (panel_message.available()) {
       uint8_t _data[howmanybytesinpacket];
@@ -258,6 +406,39 @@ void loop()
         sendI2C(_data);
       }
     }
+  }
+
+  // ── GALA speed-based volume ──────────────────────────────────────────────
+  Config gala_cfg = readConfig();
+  if (gala_cfg.gala > 0 && gala_captime > 0) {
+    uint16_t ct = gala_captime;
+    gala_captime = 0;
+    uint16_t cur_speed = (uint16_t)(1000000UL / (2UL * ct));
+
+    if (gala_prev_speed != cur_speed) {
+      // Speed threshold base and 30 km/h steps: vol up / loudness down as speed rises
+      uint16_t thr = (uint16_t)(100 - (gala_cfg.gala - 1) * 15);
+
+      // Going faster — step volume up and loudness down at each 30 km/h band
+      for (uint8_t step = 0; step < 5; step++) {
+        uint16_t v_thr = thr + step * 30;
+        uint16_t l_thr = v_thr + 15;
+        if (gala_prev_speed <= v_thr && v_thr < cur_speed) {
+          set_volume_up(); set_volume();
+        }
+        if (gala_prev_speed <= l_thr && l_thr < cur_speed && loudness > 0x06) {
+          loudness--; current_loudness = loudness + 1; set_loudness();
+        }
+        // Slowing down — step volume down and loudness up
+        if (cur_speed < v_thr && v_thr <= gala_prev_speed) {
+          set_volume_down(); set_volume();
+        }
+        if (cur_speed < l_thr && l_thr <= gala_prev_speed && loudness < 0x0E) {
+          loudness++; current_loudness = loudness - 1; set_loudness();
+        }
+      }
+    }
+    gala_prev_speed = cur_speed;
   }
 }
 

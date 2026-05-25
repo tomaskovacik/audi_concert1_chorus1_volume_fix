@@ -397,6 +397,9 @@ void loop()
       //or we should just send pointer drdp as function parameter, array with packet is not local ....no I try it and it will use 1% more of program storage space  ...
       uint8_t _data[howmanybytesinpacket];
       panel_message.read(_data);
+#ifdef USE_SERIAL
+      USEDSERIAL.print(F("PKT 0x")); USEDSERIAL.println(_data[0], HEX);
+#endif
       if (_data[0] == 0x25)//button push
       {
 #ifdef USE_SERIAL

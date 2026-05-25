@@ -62,6 +62,7 @@ FlexWire SWire = FlexWire(PB11, PB10);
 #ifdef HWV5
 #define mcuCLK    PA5  // SPI1_SCK  - MCU drives CLK (input, passive sniff)
 #define mcuDATA   PA7  // SPI1_MOSI - shared DATA via resistors (input, passive sniff)
+#define mcuCS     PA3  // output: mirrors STATUS → HW inverter → SPI1_NSS (PA4)
 #else
 #define mcuCLK PB3 //CLK
 #define mcuDATA PB4//DATA
@@ -276,19 +277,23 @@ void setup ()
   //    volume_packet[i] = 0;
   //    loudness_packet[i] = 0;
   //  }
-  // HWV5: SPI1 slave — passive sniffer on the shared CLK/DATA bus.
-  // MCU drives CLK and DATA; panel drives STATUS; we only observe.
+  // HWV5: STATUS CHANGE ISR mirrors STATUS→PA3→(HW inverter)→SPI1_NSS(PA4).
+  // Each STATUS LOW→HIGH pulse resets the SPI1 shift register via NSS,
+  // giving clean per-byte alignment without any software bit-counter reset.
   pinMode(mcuSTATUS, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInterruptOnCLK, RISING);
-  SPI.begin();                        // enable SPI1 clock and basic AF pin init
+  pinMode(mcuCS, OUTPUT);
+  digitalWrite(mcuCS, digitalRead(mcuSTATUS));   // sync PA3 with current STATUS level
+  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), mcuStatusChange, CHANGE);
+  SPI.begin();                                    // enable SPI1 RCC clock + initial AF setup
   SPI1->regs->CR1 &= ~SPI_CR1_SPE;
-  SPI1->regs->CR1 &= ~SPI_CR1_MSTR;  // slave mode
-  SPI1->regs->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI; // software NSS, always selected; MODE 0
+  SPI1->regs->CR1 &= ~(SPI_CR1_MSTR | SPI_CR1_SSM | SPI_CR1_SSI); // slave, hardware NSS
+  // Fix GPIO to INPUT before re-enabling SPI1 so the peripheral sees a clean input
+  gpio_set_mode(GPIOA, 4, GPIO_INPUT_FLOATING);  // PA4/NSS: driven via PA3→inverter on PCB
+  gpio_set_mode(GPIOA, 5, GPIO_INPUT_FLOATING);  // PA5/SCK: must be INPUT for slave
+  gpio_set_mode(GPIOA, 7, GPIO_INPUT_FLOATING);  // PA7/MOSI: must be INPUT for slave
   SPI1->regs->CR1 |= SPI_CR1_SPE;
-  SPI1->regs->CR2 |= SPI_CR2_RXNEIE; // fire __irq_spi1 on each received byte
+  SPI1->regs->CR2 |= SPI_CR2_RXNEIE;
   nvic_irq_enable(NVIC_SPI1);
-  pinMode(mcuCLK, INPUT_PULLUP);      // PA5: SPI.begin() sets AF_OUTPUT_PP; restore INPUT
-  pinMode(mcuDATA, INPUT_PULLUP);     // PA7: SPI.begin() sets AF_OUTPUT_PP; restore INPUT
   pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data sent between display and main CPU
 
@@ -1052,10 +1057,36 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 
 
 
-// ── HWV5 SPI1 RXNE ISR — passive sniffer ────────────────────────────────────
-// SPI1 fires when a byte is fully shifted in from the CLK/DATA bus.
-// Store it in _byte; disableInterruptOnCLK() picks it up on STATUS FALLING.
+// ── HWV5 STATUS CHANGE + SPI1 RXNE ISRs ─────────────────────────────────────
+// mcuStatusChange mirrors STATUS to PA3 → HW inverter → SPI1_NSS (PA4).
+// STATUS RISING  → NSS LOW  → SPI1 selected → starts counting 8 CLK edges.
+// STATUS FALLING → NSS HIGH → SPI1 deselected → shift register resets for next byte.
+// __irq_spi1 fires on RXNE (8 CLK edges received) and stores the byte in _byte.
 #ifdef HWV5
+void mcuStatusChange()
+{
+    if (digitalRead(mcuSTATUS)) {
+        // STATUS RISING: PA3 HIGH → (inverter) → NSS LOW → SPI1 active
+        digitalWrite(mcuCS, HIGH);
+        if (digitalRead(mcuCLK)) {
+            dbg_status_rising_h++;   // CLK HIGH = end of packet
+            panel_message.commit();
+            panel_message.busy = 0;
+        } else {
+            dbg_status_rising_l++;   // CLK LOW = byte about to start
+            panel_message.busy = 1;
+        }
+    } else {
+        // STATUS FALLING: PA3 LOW → (inverter) → NSS HIGH → SPI1 deselected
+        dbg_status_falling++;
+        digitalWrite(mcuCS, LOW);
+        // Read DR directly in case __irq_spi1 hasn't run yet (race with ISR priority)
+        if (SPI1->regs->SR & SPI_SR_RXNE)
+            _byte = (uint8_t)SPI1->regs->DR;
+        panel_message.write(_byte);
+    }
+}
+
 extern "C" void __irq_spi1(void)
 {
     if (SPI1->regs->SR & SPI_SR_RXNE) {
@@ -1070,7 +1101,6 @@ extern "C" void __irq_spi1(void)
 void enableInterruptOnCLK()
 {
   if (digitalRead(mcuCLK)) {
-    dbg_status_rising_h++;
     detachInterrupt(digitalPinToInterrupt(mcuSTATUS)); //we need  to do this, cose otherwise it's doing strange things
 
     //CLK is HIGH, this is end of  packet
@@ -1080,7 +1110,6 @@ void enableInterruptOnCLK()
     //after this interupt is still set to rising on STATUS line,
     panel_message.busy = 0;//we are safe to manipulate data in main loop, I just move this from disableInteruptOnCLK function
   } else {
-    dbg_status_rising_l++;
     //clk is low, start of packet
     attachInterrupt(digitalPinToInterrupt(mcuSTATUS), disableInterruptOnCLK, FALLING); //setting falling interrupt on STATE line, indicating end of byte transfer
     _byte = 0; //new data, zeroing temporary variable used to clock in data , just to be sure
@@ -1099,7 +1128,6 @@ void enableInterruptOnCLK()
 //disable CLK interrupt while STATUS is low
 void disableInterruptOnCLK()
 {
-  dbg_status_falling++;
 #ifndef HWV5
   detachInterrupt(digitalPinToInterrupt(mcuCLK)); //so STATUS is low, so all data are clocked in:
 #endif

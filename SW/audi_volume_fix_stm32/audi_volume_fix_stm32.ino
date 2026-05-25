@@ -111,10 +111,13 @@ struct CircularPacketBuffer {
   }
 
   // Zero-fill remaining bytes in current write packet then advance wdp
+  // Silently drops the packet if the buffer is full (wdp would lap rdp).
   void commit() {
     while (wbp < howmanybytesinpacket) buf[PACKET_IDX(wdp, wbp++)] = 0;
     wbp = 0;
-    if (++wdp == howmanypackets) wdp = 0;
+    uint8_t next = wdp + 1;
+    if (next == howmanypackets) next = 0;
+    if (next != rdp) wdp = next; // drop silently if full
   }
 };
 
@@ -536,8 +539,10 @@ void readCLK()
 // called by interrupt service routine when incoming data arrives
 void receiveEvent (int howMany)
 {
+  if (howMany <= 0) return;
+  if (howMany >= howmanybytesinpacket) howMany = howmanybytesinpacket - 1;
   i2c_data.busy = 1;
-  i2c_data.write(howMany);
+  i2c_data.write((uint8_t)howMany);
   for (uint8_t i = 0; i < howMany; i++) {
     i2c_data.write(Wire.read());
   }

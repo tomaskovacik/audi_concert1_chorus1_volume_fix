@@ -294,8 +294,9 @@ void setup ()
   gpio_set_mode(GPIOA, 5, GPIO_INPUT_FLOATING);
   gpio_set_mode(GPIOA, 7, GPIO_INPUT_FLOATING);
 
-  // SPI1 slave: SSM=1/SSI=1 → always selected (no NSS pin), MODE 0, 8-bit
-  SPI1->regs->CR1 = SPI_CR1_SSM | SPI_CR1_SSI;  // MSTR=0, CPOL=0, CPHA=0
+  // SPI1 slave: SSM=1/SSI=0 → always selected (NSS forced LOW), MODE 0, 8-bit.
+  // SSI=1 would force NSS HIGH (slave deselected) — that's the master MODF-prevention value.
+  SPI1->regs->CR1 = SPI_CR1_SSM;  // MSTR=0, SSI=0, CPOL=0, CPHA=0
   SPI1->regs->CR1 |= SPI_CR1_SPE;
   SPI1->regs->CR2 = 0;  // no interrupts; loop() polls SR
 

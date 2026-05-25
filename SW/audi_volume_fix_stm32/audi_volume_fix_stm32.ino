@@ -161,7 +161,7 @@ volatile uint8_t _byte; //temporary, incoming byte is shiffted here, then when w
 volatile uint8_t dbg_status_rising_h = 0; // enableInterruptOnCLK: CLK HIGH (end-of-packet)
 volatile uint8_t dbg_status_rising_l = 0; // enableInterruptOnCLK: CLK LOW  (byte start)
 volatile uint8_t dbg_status_falling  = 0; // disableInterruptOnCLK fires
-volatile uint8_t dbg_spi_rxne_poll   = 0; // SPI1 SR RXNE seen in loop() polling
+volatile uint8_t dbg_spi_rxne_poll   = 0; // SPI1 SR RXNE seen in mcuStatusChange ISR
 volatile uint8_t dbg_last_byte       = 0; // last byte from SPI1
 
 volatile uint8_t start_volume = 0xBA; //was 0xE4- set it 4leves lower, some complaints from BOSE users ..
@@ -283,7 +283,7 @@ void setup ()
   // (CLK idles HIGH between packets) corrupt byte alignment.
   pinMode(mcuSTATUS, INPUT_PULLUP);
   pinMode(mcuCS, OUTPUT);
-  digitalWrite(mcuCS, LOW);  // PA3 LOW → inverter → PA4 HIGH → NSS HIGH (idle deselected)
+  digitalWrite(mcuCS, !digitalRead(mcuSTATUS));  // 
   attachInterrupt(digitalPinToInterrupt(mcuSTATUS), mcuStatusChange, CHANGE);
 
   // Enable SPI1 and AFIO clocks directly (SPI.begin() may target SPI2 on some cores).
@@ -335,15 +335,6 @@ void printInfo() {
 void loop()
 {
 #ifdef USE_SERIAL
-  // Poll SPI1 RXNE — passive byte reception, no ISR needed
-  if (SPI1->regs->SR & SPI_SR_RXNE) {
-    uint8_t b = (uint8_t)SPI1->regs->DR;
-    dbg_last_byte = b;
-    dbg_spi_rxne_poll++;
-    if (panel_message.busy)
-      panel_message.write(b);
-  }
-
   // Print once whenever any diagnostic counter changes
   {
     static uint8_t _h, _l, _f, _p;
@@ -1083,28 +1074,47 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 
 
 // ── HWV5 passive SPI1 sniffer ────────────────────────────────────────────────
-// STATUS mirrors to PA3 → PCB inverter → PA4/NSS, gating SPI1's shift register.
-// STATUS HIGH → NSS LOW  → SPI1 selected → counts 8 CLK edges → RXNE.
-// STATUS LOW  → NSS HIGH → SPI1 shift reg resets → byte boundary guaranteed.
-// This is why SW SPI worked: it also only counted bits inside STATUS HIGH windows.
+// STATUS LOW  → NSS LOW  → SPI1 selected → counts 8 CLK edges → RXNE set.
+// STATUS HIGH → NSS HIGH → SPI1 deselected → byte complete, read DR here in ISR.
+// Reading DR in the ISR (not loop()) avoids the race where loop() is busy with
+// Serial output and the SPI DR gets overwritten before it can be read.
+// Two bugs fixed vs. polling approach:
+//  1. Last byte of packet was always dropped (busy=0 set before loop() read RXNE).
+//  2. Middle bytes were dropped when Serial print kept loop() busy too long.
 #ifdef HWV5
 void mcuStatusChange()
 {
     if (digitalRead(mcuSTATUS)) {
-        // STATUS RISING → PA3 HIGH → inverter → NSS LOW → SPI1 selected
-        digitalWrite(mcuCS, HIGH);
+        // STATUS RISING → deselect SPI1 (byte complete)
+        digitalWrite(mcuCS, LOW);   // PA3 LOW → inverter → NSS HIGH
+
+        // Harvest the completed byte immediately — before loop() gets a chance to run
+        // (mirrors disableInterruptOnCLK() in the original SW SPI implementation)
+        if (SPI1->regs->SR & SPI_SR_RXNE) {
+            uint8_t b = (uint8_t)SPI1->regs->DR;
+            dbg_last_byte = b;
+            dbg_spi_rxne_poll++;
+            panel_message.write(b);
+            if (panel_message.wbp == howmanybytesinpacket) {
+                panel_message.wbp = 0; // overflow guard — matches original disableInterruptOnCLK
+#ifdef USE_SERIAL
+                dbg_last_byte = 0xEE;  // sentinel: wbp overflow detected
+#endif
+            }
+        }
+
         if (digitalRead(mcuCLK)) {
             dbg_status_rising_h++;   // CLK HIGH = end of packet
             panel_message.commit();
             panel_message.busy = 0;
         } else {
-            dbg_status_rising_l++;   // CLK LOW = byte start
-            panel_message.busy = 1;
+            dbg_status_rising_l++;   // CLK LOW = more bytes coming (busy stays 1)
         }
     } else {
-        // STATUS FALLING → PA3 LOW → inverter → NSS HIGH → SPI1 deselected/reset
+        // STATUS FALLING → select SPI1 (new byte starting)
         dbg_status_falling++;
-        digitalWrite(mcuCS, LOW);
+        digitalWrite(mcuCS, HIGH);  // PA3 HIGH → inverter → NSS LOW
+        panel_message.busy = 1;     // block loop() from reading incomplete packet
     }
 }
 #endif // HWV5

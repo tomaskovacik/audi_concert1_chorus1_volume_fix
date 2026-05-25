@@ -277,9 +277,13 @@ void setup ()
   //    volume_packet[i] = 0;
   //    loudness_packet[i] = 0;
   //  }
-  // HWV5 passive sniffer: SPI1 slave always-selected (SSM=1/SSI=1, no NSS pin).
-  // STATUS ISR only tracks packet boundaries; bytes are polled in loop().
+  // HWV5 passive sniffer: STATUS ISR gates NSS (PA3→PCB inverter→PA4/NSS) so
+  // SPI1's shift register resets to bit-0 on every STATUS RISING — identical
+  // framing to SW SPI.  Without NSS gating, stray CLK edges between bytes
+  // (CLK idles HIGH between packets) corrupt byte alignment.
   pinMode(mcuSTATUS, INPUT_PULLUP);
+  pinMode(mcuCS, OUTPUT);
+  digitalWrite(mcuCS, LOW);  // PA3 LOW → inverter → PA4 HIGH → NSS HIGH (idle deselected)
   attachInterrupt(digitalPinToInterrupt(mcuSTATUS), mcuStatusChange, CHANGE);
 
   // Enable SPI1 and AFIO clocks directly (SPI.begin() may target SPI2 on some cores).
@@ -290,13 +294,15 @@ void setup ()
   volatile uint32_t *afio_mapr = (volatile uint32_t*)0x40010004;
   *afio_mapr &= ~(1u << 0);
 
-  // PA5/SCK and PA7/MOSI must be INPUT before enabling SPI1
+  // PA4/NSS, PA5/SCK, PA7/MOSI must be INPUT before enabling SPI1
+  gpio_set_mode(GPIOA, 4, GPIO_INPUT_FLOATING);  // NSS driven via PA3→inverter
   gpio_set_mode(GPIOA, 5, GPIO_INPUT_FLOATING);
   gpio_set_mode(GPIOA, 7, GPIO_INPUT_FLOATING);
 
-  // SPI1 slave: SSM=1/SSI=0 → always selected (NSS forced LOW), MODE 0, 8-bit.
-  // SSI=1 would force NSS HIGH (slave deselected) — that's the master MODF-prevention value.
-  SPI1->regs->CR1 = SPI_CR1_SSM;  // MSTR=0, SSI=0, CPOL=0, CPHA=0
+  // SPI1 slave: SSM=0 → hardware NSS (PA4).  NSS LOW = selected = shift reg active.
+  // PA3 HIGH → inverter → PA4 LOW → NSS LOW → SPI1 counts 8 CLK edges → RXNE.
+  // PA3 LOW  → inverter → PA4 HIGH → NSS HIGH → shift reg resets → byte framed.
+  SPI1->regs->CR1 = 0;  // MSTR=0, SSM=0, CPOL=0, CPHA=0
   SPI1->regs->CR1 |= SPI_CR1_SPE;
   SPI1->regs->CR2 = 0;  // no interrupts; loop() polls SR
 
@@ -1077,22 +1083,28 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 
 
 // ── HWV5 passive SPI1 sniffer ────────────────────────────────────────────────
-// SPI1 is always-selected (SSM=1/SSI=1); bytes arrive on PA5/PA7 without any
-// NSS management.  STATUS ISR only tracks packet boundaries; loop() polls RXNE.
+// STATUS mirrors to PA3 → PCB inverter → PA4/NSS, gating SPI1's shift register.
+// STATUS HIGH → NSS LOW  → SPI1 selected → counts 8 CLK edges → RXNE.
+// STATUS LOW  → NSS HIGH → SPI1 shift reg resets → byte boundary guaranteed.
+// This is why SW SPI worked: it also only counted bits inside STATUS HIGH windows.
 #ifdef HWV5
 void mcuStatusChange()
 {
     if (digitalRead(mcuSTATUS)) {
+        // STATUS RISING → PA3 HIGH → inverter → NSS LOW → SPI1 selected
+        digitalWrite(mcuCS, HIGH);
         if (digitalRead(mcuCLK)) {
-            dbg_status_rising_h++;   // STATUS RISING + CLK HIGH = end of packet
+            dbg_status_rising_h++;   // CLK HIGH = end of packet
             panel_message.commit();
             panel_message.busy = 0;
         } else {
-            dbg_status_rising_l++;   // STATUS RISING + CLK LOW = byte start
+            dbg_status_rising_l++;   // CLK LOW = byte start
             panel_message.busy = 1;
         }
     } else {
-        dbg_status_falling++;        // STATUS FALLING = byte done
+        // STATUS FALLING → PA3 LOW → inverter → NSS HIGH → SPI1 deselected/reset
+        dbg_status_falling++;
+        digitalWrite(mcuCS, LOW);
     }
 }
 #endif // HWV5

@@ -11,12 +11,16 @@
 
 
 /* version 5
-mcuCLK    = PA5
-mcuDATA   = PA6
-mcuSTATUS = PA15
+mcuCLK    = PA5  (SPI1_SCK  - input, MCU drives CLK)
+mcuDATA   = PA7  (SPI1_MOSI - input, MCU drives DATA)
+mcuSTATUS = PA15 (output, STM32 drives STATUS acting as panel)
+mcuCS     = PA3  (output, hardware-inverted PA15)
 */
 #define HWV5
 
+#ifdef HWV5
+#include <SPI.h>
+#endif
 #include <Wire_slave.h> //wireslave for stm32, there is no single lib for slave/master
 
 #include <FlexWire.h> //so we do not have single lib for slave/master, so we have to init another one for master .... cose we do not have 3HW i2c .... tiktak ...
@@ -57,8 +61,9 @@ FlexWire SWire = FlexWire(PB11, PB10);
 //#define displayRESET 8
 //STM32
 #ifdef HWV5
-#define mcuCLK PA5 //CLK
-#define mcuDATA PA6//DATA
+#define mcuCLK    PA5  // SPI1_SCK  - MCU drives CLK
+#define mcuDATA   PA7  // SPI1_MOSI - MCU drives DATA (was PA6 in HWv4 bit-bang mode)
+#define mcuCS     PA3  // output: hardware-inverted PA15 (mirrors !STATUS)
 #else
 #define mcuCLK PB3 //CLK
 #define mcuDATA PB4//DATA
@@ -266,11 +271,23 @@ void setup ()
   //    volume_packet[i] = 0;
   //    loudness_packet[i] = 0;
   //  }
-  //init pins for display SPI
-  pinMode(mcuSTATUS, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInterruptOnCLK, RISING);
+  // HWV5: SPI1 slave — STM32 acts as front panel toward the Audi radio MCU.
+  // MCU drives CLK; we drive STATUS in response (standard SPI slave handshake).
   pinMode(mcuCLK, INPUT_PULLUP);
-  pinMode(mcuDATA, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(mcuCLK), mcuClkChange, CHANGE);
+  pinMode(mcuDATA, INPUT_PULLUP);    // SPI1_MOSI
+  pinMode(mcuSTATUS, OUTPUT);        // we drive STATUS (panel role)
+  digitalWrite(mcuSTATUS, HIGH);     // idle HIGH
+  pinMode(mcuCS, OUTPUT);            // PA3: hw-inverted PA15
+  digitalWrite(mcuCS, LOW);          // STATUS HIGH → CS LOW
+  SPI.begin();                       // configure PA5/PA6/PA7 as SPI1 AF pins
+  SPI1->CR1 &= ~SPI_CR1_SPE;
+  SPI1->CR1 &= ~SPI_CR1_MSTR;       // slave mode
+  SPI1->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI; // software NSS; CPOL=0 CPHA=0 (MODE 0)
+  SPI1->CR1 |= SPI_CR1_SPE;
+  SPI1->DR   = 0x00;                 // pre-load MISO idle value
+  SPI1->CR2 |= SPI_CR2_RXNEIE;      // fire SPI1_IRQHandler on each received byte
+  NVIC_EnableIRQ(SPI1_IRQn);
   pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data sent between display and main CPU
 
@@ -1011,7 +1028,48 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 
 
 
-//enable RISING interrupt on CLK line when STATUS line rises
+// ── HWV5 SPI1 slave ISRs ────────────────────────────────────────────────────
+// CLK FALLING: MCU starts a byte; we toggle STATUS LOW→HIGH (slave ready).
+// CLK RISING:  End of packet; close the panel_message packet.
+// SPI1 RXNE:   Byte fully shifted in; store it and toggle STATUS (byte done).
+#ifdef HWV5
+void mcuClkChange()
+{
+    if (!digitalRead(mcuCLK)) {
+        panel_message.busy = 1;
+        digitalWrite(mcuCS, HIGH);
+        digitalWrite(mcuSTATUS, LOW);
+        digitalWrite(mcuSTATUS, HIGH);
+        digitalWrite(mcuCS, LOW);
+        if (SPI1->SR & SPI_SR_RXNE) (void)SPI1->DR; // flush stale byte
+    } else {
+        if (SPI1->SR & SPI_SR_RXNE)
+            panel_message.write((uint8_t)SPI1->DR);
+        panel_message.commit();
+        panel_message.busy = 0;
+        digitalWrite(mcuSTATUS, HIGH);
+        digitalWrite(mcuCS, LOW);
+    }
+}
+
+inline void spi1ByteReceived()
+{
+    panel_message.write((uint8_t)SPI1->DR);
+    SPI1->DR = 0x00;
+    digitalWrite(mcuCS, HIGH);
+    digitalWrite(mcuSTATUS, LOW);
+    digitalWrite(mcuSTATUS, HIGH);
+    digitalWrite(mcuCS, LOW);
+}
+
+extern "C" void SPI1_IRQHandler(void) __attribute__((interrupt("IRQ")));
+extern "C" void SPI1_IRQHandler(void)
+{
+    if (SPI1->SR & SPI_SR_RXNE) spi1ByteReceived();
+}
+#endif // HWV5
+
+//enable RISING interrupt on CLK line when STATUS line rises (non-HWV5 passive sniffing)
 void enableInterruptOnCLK()
 {
   if (digitalRead(mcuCLK)) {

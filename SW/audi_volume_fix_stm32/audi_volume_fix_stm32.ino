@@ -128,6 +128,7 @@ volatile uint8_t current_loudness = start_loudness; //start loudness : OFF
 volatile uint8_t grab_volume = 1;
 
 volatile uint8_t mute = 0;
+volatile uint8_t in_volume_recalc = 0;
 
 
 uint8_t volume_packet[howmanybytesinpacket];
@@ -354,7 +355,7 @@ void loop()
         if ((_data[2] & B00000001)) {
           //2 8 81
           // USEDSERIAL.println(F("Muting")); dump_i2c_data(_data);
-          if (!mute) { //we are not already muted
+          if (!mute && !in_volume_recalc) { //we are not already muted and not in volume recalculation
             mute = 1; //set mute flag
             saved_volume = current_volume;//save current volume
             volume = 0xFF; //set volume to be 0xFF (volume full down,off)
@@ -415,7 +416,7 @@ void set_unmute() {
 }
 
 void set_volume_up() {
-  mute = 1; //fix #3
+  in_volume_recalc = 1; //fix #3
   // volume, 0xFF=off, 0x00=full on
   // if (volume == 0xFF) set_unmute();
   if (volume > 0xEA) {
@@ -481,7 +482,7 @@ void set_volume_up() {
 }
 
 void set_volume_down() {
-  mute = 1; //fix #3
+  in_volume_recalc = 1; //fix #3
   if (volume < 0x14) {
     volume = 0x14;
   } else if (volume < 0x18) {
@@ -548,6 +549,8 @@ void set_volume_down() {
 
 */
 void set_volume() {
+  if (volume == 0xFF && !mute) saved_volume = current_volume;
+
   while (volume != current_volume) { //need to fix volume
     //     USEDSERIAL.println("=================== before fix ====================");
     //     USEDSERIAL.print("current volume: ");  USEDSERIAL.println(current_volume, HEX);
@@ -585,6 +588,7 @@ void set_volume() {
 
   if (volume == 0xFF) set_mute();
   if (volume < 0xFE) set_unmute();
+  in_volume_recalc = 0;
 }
 
 void set_loudness()

@@ -156,6 +156,13 @@ CircularPacketBuffer i2c_data      = { _i2c_data_buf,  0, 0, 0, false }; // I2C 
 
 volatile uint8_t _byte; //temporary, incoming byte is shiffted here, then when we are done grabbing it, it is stored in array each packet alone in one row
 
+// HWV5 passive-SPI1 debug counters (written from ISRs, read from loop())
+volatile uint8_t dbg_status_rising_h = 0; // enableInterruptOnCLK: CLK HIGH (end-of-packet)
+volatile uint8_t dbg_status_rising_l = 0; // enableInterruptOnCLK: CLK LOW  (byte start)
+volatile uint8_t dbg_status_falling  = 0; // disableInterruptOnCLK fires
+volatile uint8_t dbg_spi_rxne_count  = 0; // __irq_spi1 RXNE fires
+volatile uint8_t dbg_last_byte       = 0; // last byte from SPI1
+
 volatile uint8_t start_volume = 0xBA; //was 0xE4- set it 4leves lower, some complaints from BOSE users ..
 
 volatile uint8_t volume = start_volume; //set start volume here ...
@@ -288,6 +295,7 @@ void setup ()
   //serial for debug
 #ifdef USE_SERIAL
   USEDSERIAL.begin(115200);
+  USEDSERIAL.println(F("HWV5 passive SPI1 ready"));
 #endif
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
@@ -309,6 +317,20 @@ void printInfo() {
 void loop()
 {
 #ifdef USE_SERIAL
+  // Print once whenever any diagnostic counter changes
+  {
+    static uint8_t _h, _l, _f, _r;
+    if (dbg_status_rising_h != _h || dbg_status_rising_l != _l ||
+        dbg_status_falling != _f || dbg_spi_rxne_count != _r) {
+      USEDSERIAL.print(F("STA^H=")); USEDSERIAL.print(dbg_status_rising_h);
+      USEDSERIAL.print(F(" L="));    USEDSERIAL.print(dbg_status_rising_l);
+      USEDSERIAL.print(F(" STA_="));  USEDSERIAL.print(dbg_status_falling);
+      USEDSERIAL.print(F(" RXNE=")); USEDSERIAL.print(dbg_spi_rxne_count);
+      USEDSERIAL.print(F(" byte=0x")); USEDSERIAL.println(dbg_last_byte, HEX);
+      _h = dbg_status_rising_h; _l = dbg_status_rising_l;
+      _f = dbg_status_falling;  _r = dbg_spi_rxne_count;
+    }
+  }
   if (Serial.available()) {
     char serial_char = Serial.read();
     switch (serial_char) {
@@ -709,9 +731,16 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
 void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
   grab_volume = 1;
 #ifdef USE_SERIAL
-  //  if(_data[1] == 0x13)  USEDSERIAL.println(_data[2],BIN); //debug
-  uint8_t dump = 0;
-  switch (_data[1]) { //switching second byte, which indicate type of packet data
+  // Raw hex dump — verbose decode commented out for debugging
+  USEDSERIAL.print(F("SPI:"));
+  for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
+    USEDSERIAL.print(' '); USEDSERIAL.print(_data[i], HEX);
+  }
+  USEDSERIAL.println();
+  if (_data[1] == 0x58) grab_volume = 0;
+  if (_data[1] == 0x71 && (_data[2] >> 4) <= 7) grab_volume = 0;
+  (void)0; /* verbose decode below is intentionally disabled for debug session */
+  if (false) { uint8_t dump = 0; switch (_data[1]) { //switching second byte, which indicate type of packet data
     case 0x13:
       //leds: whole packet: 9A 13 2E 0 29 0 0 0 0 0 0 0 0 0 0
       {
@@ -986,7 +1015,8 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
   if (dump) {
     dump_i2c_data(_data);
   }
-  
+  } // end if(false)
+
 #else
 
   if (_data[1] == 0x58)
@@ -1028,8 +1058,11 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 #ifdef HWV5
 extern "C" void __irq_spi1(void)
 {
-    if (SPI1->regs->SR & SPI_SR_RXNE)
+    if (SPI1->regs->SR & SPI_SR_RXNE) {
         _byte = (uint8_t)SPI1->regs->DR;
+        dbg_last_byte = _byte;
+        dbg_spi_rxne_count++;
+    }
 }
 #endif // HWV5
 
@@ -1037,6 +1070,7 @@ extern "C" void __irq_spi1(void)
 void enableInterruptOnCLK()
 {
   if (digitalRead(mcuCLK)) {
+    dbg_status_rising_h++;
     detachInterrupt(digitalPinToInterrupt(mcuSTATUS)); //we need  to do this, cose otherwise it's doing strange things
 
     //CLK is HIGH, this is end of  packet
@@ -1046,6 +1080,7 @@ void enableInterruptOnCLK()
     //after this interupt is still set to rising on STATUS line,
     panel_message.busy = 0;//we are safe to manipulate data in main loop, I just move this from disableInteruptOnCLK function
   } else {
+    dbg_status_rising_l++;
     //clk is low, start of packet
     attachInterrupt(digitalPinToInterrupt(mcuSTATUS), disableInterruptOnCLK, FALLING); //setting falling interrupt on STATE line, indicating end of byte transfer
     _byte = 0; //new data, zeroing temporary variable used to clock in data , just to be sure
@@ -1064,6 +1099,7 @@ void enableInterruptOnCLK()
 //disable CLK interrupt while STATUS is low
 void disableInterruptOnCLK()
 {
+  dbg_status_falling++;
 #ifndef HWV5
   detachInterrupt(digitalPinToInterrupt(mcuCLK)); //so STATUS is low, so all data are clocked in:
 #endif
@@ -1411,8 +1447,9 @@ void spk_atten(uint8_t c) {
 }
 
 void decode_button_push(uint8_t data) {
-  //  USEDSERIAL.print(data,HEX);
-  switch (data) {
+  // verbose decode replaced with raw hex for debug session
+  USEDSERIAL.print(F("BTN: 0x")); USEDSERIAL.println(data, HEX);
+  if (false) { switch (data) {
     case PANEL_1:
       USEDSERIAL.println(F(" 1"));
       break;
@@ -1527,6 +1564,6 @@ void decode_button_push(uint8_t data) {
     default:
       USEDSERIAL.print(F("Unknown button pushed: "));  USEDSERIAL.println(data, HEX);
       break;
-  }
+  } } // end if(false)
 }
 #endif

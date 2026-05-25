@@ -28,7 +28,6 @@ mcuSTATUS = PA15 (input, panel drives STATUS)
 FlexWire SWire = FlexWire(PB11, PB10);
 
 //TwoWire Swire = TwoWire(PB11, PB10);
-
 #define USE_SERIAL
 //use Serial for medium-high density devices like stm32F103C8/B
 //use Serial1 for low-density devices like stm32f103c6
@@ -72,7 +71,7 @@ FlexWire SWire = FlexWire(PB11, PB10);
 #define VERSION "1.0-09.06.22-HWv3"
 #else//hw v4 and v5
 #define mcuSTATUS PA15 //STATUS/CS
-#define VERSION "1.0-09.06.22-HWv4"
+#define VERSION "2.0-25.05.26-HWv4"
 #endif
 #if defined(HWV5) || defined(HWV4) || defined(HWV3)
 #define displayRESET PB8 //not used anyway ... 
@@ -157,12 +156,6 @@ CircularPacketBuffer i2c_data      = { _i2c_data_buf,  0, 0, 0, false }; // I2C 
 
 volatile uint8_t _byte; //temporary, incoming byte is shiffted here, then when we are done grabbing it, it is stored in array each packet alone in one row
 
-// HWV5 passive-SPI1 debug counters (written from ISRs, read from loop())
-volatile uint8_t dbg_status_rising_h = 0; // enableInterruptOnCLK: CLK HIGH (end-of-packet)
-volatile uint8_t dbg_status_rising_l = 0; // enableInterruptOnCLK: CLK LOW  (byte start)
-volatile uint8_t dbg_status_falling  = 0; // disableInterruptOnCLK fires
-volatile uint8_t dbg_spi_rxne_poll   = 0; // SPI1 SR RXNE seen in mcuStatusChange ISR
-volatile uint8_t dbg_last_byte       = 0; // last byte from SPI1
 
 volatile uint8_t start_volume = 0xBA; //was 0xE4- set it 4leves lower, some complaints from BOSE users ..
 
@@ -209,7 +202,7 @@ void set_loudness();
 /*
    calculate speaker attenuations, cose we are calculating this for each speaker, so I made a function to avoid long code...
 */
-void spk_atten(uint8_t c);
+//void spk_atten(uint8_t c);
 
 /*
    RISING interrupt on STATE line
@@ -252,9 +245,6 @@ void readCLK();
    classic setup function
 
 */
-#ifdef USE_SERIAL
-void dump_i2c_data(uint8_t _data[howmanybytesinpacket]);
-#endif
 
 void set_mute();
 void set_unmute();
@@ -273,14 +263,7 @@ void setup ()
   //master i2c to send data(fixed) to TDA7342
   SWire.begin();
 
-  //  for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
-  //    volume_packet[i] = 0;
-  //    loudness_packet[i] = 0;
-  //  }
-  // HWV5 passive sniffer: STATUS ISR gates NSS (PA3→PCB inverter→PA4/NSS) so
-  // SPI1's shift register resets to bit-0 on every STATUS RISING — identical
-  // framing to SW SPI.  Without NSS gating, stray CLK edges between bytes
-  // (CLK idles HIGH between packets) corrupt byte alignment.
+  // HWV5 passive sniffer: STATUS ISR gates NSS (PA3→PA4/NSS) so
   pinMode(mcuSTATUS, INPUT_PULLUP);
   pinMode(mcuCS, OUTPUT);
   digitalWrite(mcuCS, !digitalRead(mcuSTATUS));  // 
@@ -308,18 +291,11 @@ void setup ()
 
   pinMode(displayRESET, INPUT);
 
-  //serial for debug
 #ifdef USE_SERIAL
   USEDSERIAL.begin(115200);
-  USEDSERIAL.print(F("HWV5 SPI1 CR1=0x")); USEDSERIAL.print(SPI1->regs->CR1, HEX);
-  USEDSERIAL.print(F(" CR2=0x")); USEDSERIAL.print(SPI1->regs->CR2, HEX);
-  USEDSERIAL.print(F(" AFIO=0x")); USEDSERIAL.println(*afio_mapr, HEX);
+  printInfo();
 #endif
-  //arduino
-  //      if (!i2c_init()) // Initialize everything and check for bus lockup
-  //#ifdef USE_SERIAL
-  //    USEDSERIAL.println(F("I2C init failed");
-  //#endif
+
   set_volume();
 }  // end of setup
 
@@ -329,143 +305,75 @@ void printInfo() {
   USEDSERIAL.println(F("(C) kovo, GPL3"));
   USEDSERIAL.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
   USEDSERIAL.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
-  // USEDSERIAL.println((dumpI2cDataAndDoNotFix ? F("Dumping i2c only ") : F("Fixing volume")));
 }
 
 void loop()
 {
 #ifdef USE_SERIAL
-  // Print once whenever any diagnostic counter changes
-  {
-    static uint8_t _h, _l, _f, _p;
-    if (dbg_status_rising_h != _h || dbg_status_rising_l != _l ||
-        dbg_status_falling != _f || dbg_spi_rxne_poll != _p) {
-      USEDSERIAL.print(F("STA^H=")); USEDSERIAL.print(dbg_status_rising_h);
-      USEDSERIAL.print(F(" L="));    USEDSERIAL.print(dbg_status_rising_l);
-      USEDSERIAL.print(F(" STA_="));  USEDSERIAL.print(dbg_status_falling);
-      USEDSERIAL.print(F(" POLL=")); USEDSERIAL.print(dbg_spi_rxne_poll);
-      USEDSERIAL.print(F(" byte=0x")); USEDSERIAL.println(dbg_last_byte, HEX);
-      _h = dbg_status_rising_h; _l = dbg_status_rising_l;
-      _f = dbg_status_falling;  _p = dbg_spi_rxne_poll;
-    }
-  }
   if (Serial.available()) {
-    char serial_char = Serial.read();
-    switch (serial_char) {
-      case 'D':
-      //      case 'd':
-      //      {
-      //        dumpI2cDataAndDoNotFix = !dumpI2cDataAndDoNotFix;
-      //        printInfo();
-      //      }
-      //      break;
-      case 'h':
-      case 'H':
-      case '?':
-      case 'v':
-      case 'V':
-        {
-          printInfo();
-        }
-        break;
-    }
+    if (Serial.read() == 'v') printInfo();
   }
 #endif
-  /*
-    if (digitalRead(displayRESET) && !displayRESETstate) {
-       USEDSERIAL.println("Reset HIGH");
-      displayRESETstate = 1;
-    }
-    if (!digitalRead(displayRESET) && displayRESETstate) {
-       USEDSERIAL.println("Reset LOW");
-      displayRESETstate = 0;
-      wdp = rdp = dwdp = drdp = 0; // old API; new: i2c_data.wdp = i2c_data.rdp = panel_message.wdp = panel_message.rdp = 0;
-      while(!digitalRead(displayRESET)){
-        //caled for sleep
-        delay(1);
-      }
-    }
-  */
-  if (!panel_message.busy) { //no data are send on SPI line
-
-    while (panel_message.available()) { //reading and writing pointers are not in sync, we have some data which should be analyzed
-      //move current reading data from array of packet in separate variable,
-      //here should be memcopy, no for ... but... who cares ...
-      //or we should just send pointer drdp as function parameter, array with packet is not local ....no I try it and it will use 1% more of program storage space  ...
+  if (!panel_message.busy) {
+    while (panel_message.available()) {
       uint8_t _data[howmanybytesinpacket];
       panel_message.read(_data);
 #ifdef USE_SERIAL
-      USEDSERIAL.print(F("PKT 0x")); USEDSERIAL.println(_data[0], HEX);
+      if (_data[0] == 0x25) {
+        USEDSERIAL.print(F("BTN "));
+        USEDSERIAL.println(_data[1], HEX);
+      }
 #endif
-      if (_data[0] == 0x25)//button push
-      {
-#ifdef USE_SERIAL
-        decode_button_push(_data[1]); //function which send to serial port real function of pressed button in human language
-#endif
-        //if (!dumpI2cDataAndDoNotFix) {
-        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) { //volume knob was turned up, and cose grab_volume is set to 1, we  know that is volume not  bass/treble/balance/fade, we set grab_volume=0 when display shows bass/treble/balance/fade)
+      if (_data[0] == 0x25) {
+        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) {
           set_volume_up();
           set_volume();
         }
-        if (grab_volume == 1 &&  (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) { //same as previous but knob goes down
+        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) {
           set_volume_down();
           set_volume();
         }
-        //}
       }
-      if (_data[0] == 0x9A) { // packet starting with 0x95 is update for panel, text, indications leds ....
+      if (_data[0] == 0x9A) {
         decode_display_data(_data);
       }
 
     }
   }
-  if (!i2c_data.busy) {// not capturing i2c, safe to mess with it
-    while (i2c_data.available()) {//reading and writing pointers are not in sync, we have some data which should be analyzed
-      //move current reading data from array of packet in separate variable,
-      //here should be memcopy, no for ... but... who cares ...
+  if (!i2c_data.busy) {
+    while (i2c_data.available()) {
       uint8_t _data[howmanybytesinpacket];
       i2c_data.read(_data);
-      // USEDSERIAL.println();
-      // if (!dumpI2cDataAndDoNotFix) {
-      if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {//volume was set by panel, and is probably fucked :) , only fixing volume packet, subbaddress = ?
-        // USEDSERIAL.println(F("volume or loudness IGNORING!"));
-        // USEDSERIAL.println(F("VOLI!"));
-        //set_volume();
-      } else if (_data[1] == 8 ) { //MUTE
-        // USEDSERIAL.println(F("MUTE "));
+#ifdef USE_SERIAL
+      USEDSERIAL.print(F("I2C"));
+      for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
+        USEDSERIAL.print(' '); USEDSERIAL.print(_data[i], HEX);
+      }
+      USEDSERIAL.println();
+#endif
+      if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {
+        // volume/loudness packet from panel — ignore, we control volume ourselves
+      } else if (_data[1] == 8) { // MUTE
         if ((_data[2] & B00000001)) {
-          //2 8 81
-          // USEDSERIAL.println(F("Muting")); dump_i2c_data(_data);
-          if (!mute && !in_volume_recalc) { //we are not already muted and not in volume recalculation
-            mute = 1; //set mute flag
-            saved_volume = current_volume;//save current volume
-            volume = 0xFF; //set volume to be 0xFF (volume full down,off)
-            set_volume();//set new volume
-            //test delay(5);//to be sure? should check this on scope,
-          }
-          sendI2C(_data);//but send mute  command out anyway
-        } else { //if it's not 1 then it's zero :)
-          //2 8 80
-          // USEDSERIAL.println(F("Unmuting")); dump_i2c_data(_data);
-
-          if (mute) { //only unmute, if we are not unmuted already
-            mute = 0; //clear mute flag
-            volume = saved_volume;
-            //saved_volume = start_volume; //set this to safe value if we fucked something in code, which I probably did :)
+          if (!mute && !in_volume_recalc) {
+            mute = 1;
+            saved_volume = current_volume;
+            volume = 0xFF;
             set_volume();
           }
-          sendI2C(_data);//send unmute command out before volume set
+          sendI2C(_data);
+        } else {
+          if (mute) {
+            mute = 0;
+            volume = saved_volume;
+            set_volume();
+          }
+          sendI2C(_data);
         }
       } else {
         sendI2C(_data);
       }
-      /*      } else { //dumpI2cDataAndDoNotFix - we are gonna just dump data
-               USEDSERIAL.print(millis()+String(" [")); dump_i2c_data(_data);  USEDSERIAL.print(F("] "));
-              sendI2C(_data);
-            }*/
-
     }
-    //       USEDSERIAL.print(F("wdp: ");  USEDSERIAL.print(wdp);  USEDSERIAL.print(F(" rdp ");  USEDSERIAL.println(rdp);
   }
 }
 
@@ -701,20 +609,6 @@ void set_loudness()
   }
 }
 
-#ifdef USE_SERIAL
-void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
-
-  USEDSERIAL.print(F("unknown display data: "));
-  // }
-  for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
-    USEDSERIAL.print(_data[i], HEX);
-    USEDSERIAL.print(F(" "));
-    //     USEDSERIAL.write(_data[i]);
-  }
-  USEDSERIAL.println();
-}
-#endif
-
 /*
 
    decoding display data  parameter is array with data packet
@@ -751,325 +645,21 @@ void dump_i2c_data(uint8_t _data[howmanybytesinpacket]) {
 
 void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
   grab_volume = 1;
+
+  // grab_volume logic: suppress volume knob handling while panel shows
+  // bass/treble/balance/fade/volume-setting menus
+  if (_data[1] == 0x58) grab_volume = 0;                    // settings menu text
+  if (_data[1] == 0x71 && (_data[2] >> 4) <= 7) grab_volume = 0; // BAS/TRE/BAL/FAD
+
 #ifdef USE_SERIAL
-  // Raw hex dump — verbose decode commented out for debugging
-  USEDSERIAL.print(F("SPI:"));
+  USEDSERIAL.print(F("SPI"));
   for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
     USEDSERIAL.print(' '); USEDSERIAL.print(_data[i], HEX);
   }
   USEDSERIAL.println();
-  if (_data[1] == 0x58) grab_volume = 0;
-  if (_data[1] == 0x71 && (_data[2] >> 4) <= 7) grab_volume = 0;
-  (void)0; /* verbose decode below is intentionally disabled for debug session */
-  if (false) { uint8_t dump = 0; switch (_data[1]) { //switching second byte, which indicate type of packet data
-    case 0x13:
-      //leds: whole packet: 9A 13 2E 0 29 0 0 0 0 0 0 0 0 0 0
-      {
-        grab_volume = 1;
-        // USEDSERIAL.println(_data[2],BIN);
-        if (_data[2] & B00000001)  USEDSERIAL.print(F("REG ")); //REG bit
-        if (_data[2] & B00000010)  USEDSERIAL.print(F("RDS ")); //RDS bit
-        if (_data[2] & B00000100)  USEDSERIAL.print(F("AS ")); //AS bit
-        if (_data[2] & B00001000) {
-          if (_data[2] & B01000000)  USEDSERIAL.print(F("FM1 ")); //FM + 1 bit
-          if (_data[2] & B00100000)  USEDSERIAL.print(F("FM2 ")); //FM + 2 bit
-          if (_data[2] & B00010000)  USEDSERIAL.print(F("AM ")); //FM+|=AM bit
-        }
-        USEDSERIAL.println();
-        USEDSERIAL.print(F("Memory: "));  USEDSERIAL.println(_data[3] & B00000011); //Memory
-
-
-        USEDSERIAL.println();
-        USEDSERIAL.println(F("LEDS: "));
-        //this are in data[2]
-        if (_data[3] & B00001000)  USEDSERIAL.print(F("CPS ")); //CPS
-        if (_data[3] & B00100000)  USEDSERIAL.print(F("Dolby ")); //Dolby
-        if (_data[3] & B00010000)  USEDSERIAL.print(F("RD ")); //RD
-        //other in data[4]
-        if (_data[4] & B00000001)  USEDSERIAL.print(F("RDS "));
-        if (_data[4] & B00000010)  USEDSERIAL.print(F("AM "));
-        if (_data[4] & B00000100)  USEDSERIAL.print(F("TP "));
-        if (_data[4] & B00001000)  USEDSERIAL.print(F("FM "));
-        if (_data[4] & B00010000)  USEDSERIAL.print(F("SCAN "));
-        if (_data[4] & B00100000)  USEDSERIAL.print(F("AS "));
-        if (_data[4] & B01000000)  USEDSERIAL.print(F("MODE "));
-        USEDSERIAL.println();
-      }
-      break;
-    case 0x23:
-      {
-        USEDSERIAL.println(F("display clear"));
-      }
-      break;
-    case 0x32: //freq?
-      {
-        grab_volume = 1;
-        if (_data[3] == 0x10) { //AM
-          uint16_t freq = 531;
-          freq = freq + (_data[2] * 9);
-          USEDSERIAL.print(F("freq: "));
-          USEDSERIAL.print(freq);
-          USEDSERIAL.println(F(" kHz (AM)"));
-        } else { //FM
-          float freq = 875;
-          freq = freq + _data[2];
-          USEDSERIAL.print(F("freq: "));
-          USEDSERIAL.print(freq / 10, 1);
-          USEDSERIAL.println(F(" Mhz (FM)"));
-        }
-      }
-      break;
-    case 0x48:
-      {
-        grab_volume = 1;
-        USEDSERIAL.print(F("display data ASCI: "));
-        // }
-        for (uint8_t i = 2; i < howmanybytesinpacket; i++) {
-          USEDSERIAL.write(_data[i]);
-          //debug
-          // USEDSERIAL.print(F(" ");
-          // USEDSERIAL.write(_data[i]);
-        }
-        USEDSERIAL.println();
-      }
-      break;
-    case 0x58:
-      {
-        grab_volume = 0;
-        //54 41 20 20 20 35 20 20 0 0 0 0 0
-        //TEXT: VOL  1->...->5
-        //TEXT: SENS LO
-        //TEXT: RM   ON
-        //TEXT: NAV  1->...->5
-        //TEXT: TEL  L
-        //TEXT: TA   1->...->5
-        //TEXT: GALA OFF->1-...->5
-        USEDSERIAL.write(_data[2]);
-        USEDSERIAL.write(_data[3]);
-        USEDSERIAL.write(_data[4]);
-        USEDSERIAL.write(_data[5]);
-        USEDSERIAL.write(_data[6]);
-        USEDSERIAL.write(_data[7]);
-        USEDSERIAL.write(_data[8]);
-        USEDSERIAL.write(_data[9]);
-        USEDSERIAL.println();
-      }
-      break;
-    case 0x61:
-      {
-        grab_volume = 1;
-        switch (_data[2]) {
-          case 0x01:
-            USEDSERIAL.println(F("TAPE: /\\"));
-            break;
-          case 2:
-            USEDSERIAL.println(F("TAPE: \\/"));
-            break;
-          case 3:
-            USEDSERIAL.println(F("TAPE:  > (FF)"));
-            break;
-          case 4:
-            USEDSERIAL.println(F("TAPE:  < (FR)"));
-            break;
-          case 0:
-            USEDSERIAL.println(F("TAPE: Eject"));
-            break;
-          case 0x10:
-            USEDSERIAL.println(F("TP-INFO"));
-            break;
-          case 0x0B:
-            USEDSERIAL.println(F("SAFE"));
-            break;
-          //9A 61 14
-          case 0x14:
-            USEDSERIAL.println(F("DIAG."));
-            break;
-          case 0x17:
-            USEDSERIAL.println(F("??????????"));
-            break;
-          //BOSE: 9A 61 1A
-          case 0x1A:
-            USEDSERIAL.println("      BOSE      ");
-            break;
-          default:
-            dump = 1;
-        }
-      }
-      break;
-    case 0x71:
-      {
-        //   USEDSERIAL.print(F("Stored text::");
-        switch (_data[2] >> 4) {
-          case 0x00:
-            grab_volume = 0;
-            USEDSERIAL.print(F("BAS "));
-            if ((_data[2] & 0x0F) == 0) {
-              USEDSERIAL.println(0);
-            } else {
-              USEDSERIAL.print(F("+"));
-              USEDSERIAL.println((_data[2] & 0x0F), DEC);
-            }
-            break;
-          case 0x1:
-            grab_volume = 0;
-            USEDSERIAL.print(F("BAS "));
-            if ((_data[2] & 0x0F) == 0) {
-              USEDSERIAL.println(0);
-            } else {
-              USEDSERIAL.print(F("-"));
-              USEDSERIAL.println((_data[2] & 0x0F), DEC);
-            }
-            break;
-          case 0x2:
-            grab_volume = 0;
-            USEDSERIAL.print(F("TRE "));
-            if ((_data[2] & 0x0F) == 0) {
-              USEDSERIAL.println(0);
-            } else {
-              USEDSERIAL.print(F("+"));
-              USEDSERIAL.println((_data[2] & 0x0F), DEC);
-            }
-            break;
-          case 0x3:
-            grab_volume = 0;
-            USEDSERIAL.print(F("TRE "));
-            if ((_data[2] & 0x0F) == 0) {
-              USEDSERIAL.println(0);
-            } else {
-              USEDSERIAL.print(F("-"));
-              USEDSERIAL.println((_data[2] & 0x0F), DEC);
-            }
-            break;
-          case 0x4:
-            grab_volume = 0;
-            USEDSERIAL.print(F("BAL "));
-            if ((_data[2] & 0x0F) == 0) {
-              USEDSERIAL.println(0);
-            } else {
-              USEDSERIAL.print(F("R"));
-              USEDSERIAL.println((_data[2] & 0x0F), DEC);
-            }
-            break;
-          case 0x5:
-            grab_volume = 0;
-            USEDSERIAL.print(F("BAL "));
-            if ((_data[2] & 0x0F) == 0) {
-              USEDSERIAL.println(0);
-            } else {
-              USEDSERIAL.print(F("L"));
-              USEDSERIAL.println((_data[2] & 0x0F), DEC);
-            }
-            break;
-          case 0x6:
-            grab_volume = 0;
-            USEDSERIAL.print(F("FAD "));
-            if ((_data[2] & 0x0F) == 0) {
-              USEDSERIAL.println(0);
-            } else {
-              USEDSERIAL.print(F("F"));
-              USEDSERIAL.println((_data[2] & 0x0F), DEC);
-            }
-            break;
-          case 0x7:
-            grab_volume = 0;
-            USEDSERIAL.print(F("FAD "));
-            if ((_data[2] & 0x0F) == 0) {
-              USEDSERIAL.println(0);
-            } else {
-              USEDSERIAL.print(F("R"));
-              USEDSERIAL.println((_data[2] & 0x0F), DEC);
-            }
-            break;
-          case 0xA:
-            grab_volume = 1;
-            USEDSERIAL.print(F("TP - MEM ")); //A1 is MEM 1?
-            USEDSERIAL.print((_data[2] & 0x0F), DEC);
-            break;
-          case 0xB:
-            {
-              grab_volume = 1;
-              //GALA
-              USEDSERIAL.print("GALA "); //start radio with [2] pressed
-
-              if ((_data[2] & 0x0F) == 1)  USEDSERIAL.println(F("OFF"));
-              if ((_data[2] & 0x0F) == 0)  USEDSERIAL.println(F("ODB"));
-            }
-            break;
-          default:
-            dump = 1;
-        }
-      }
-      break;
-    case 0x80:
-      {
-        if (_data[2] == 0x00)  USEDSERIAL.println(F("Shutdown"));
-      }
-      break;
-    case 0x92:
-      {
-        USEDSERIAL.print(F("Entered safe code:"));
-        USEDSERIAL.print(_data[2], HEX);
-        USEDSERIAL.println(_data[3], HEX);
-        // USEDSERIAL.print(_data[4],HEX);
-        // USEDSERIAL.println(_data[5],HEX);
-      }
-      break;
-    case 0xA2:
-      {
-        grab_volume = 1;
-        USEDSERIAL.print(F("CD"));
-        USEDSERIAL.print(_data[2], HEX);
-        USEDSERIAL.print(F(" TR"));
-        USEDSERIAL.println(_data[3], HEX);
-      }
-      break;
-    case 0xE1:
-      {
-        if (_data[2] == 0xFB)  USEDSERIAL.println(F("Start"));
-      }
-      break;
-    default:
-      {
-        dump = 1;
-      }
-  }
-  if (dump) {
-    dump_i2c_data(_data);
-  }
-  } // end if(false)
-
-#else
-
-  if (_data[1] == 0x58)
-  {
-    grab_volume = 0;
-    //54 41 20 20 20 35 20 20 0 0 0 0 0
-    //TEXT: VOL  1->...->5
-    //TEXT: SENS LO
-    //TEXT: RM   ON
-    //TEXT: NAV  1->...->5
-    //TEXT: TEL  L
-    //TEXT: TA   1->...->5
-    //TEXT: GALA OFF->1-...->5
-  }
-  if (_data[1] == 0x71)
-  {
-    //   USEDSERIAL.print(F("Stored text::");
-    switch (_data[2] >> 4) {
-      case 0x00: grab_volume = 0; break;
-      case 0x1: grab_volume = 0; break;
-      case 0x2: grab_volume = 0; break;
-      case 0x3: grab_volume = 0; break;
-      case 0x4: grab_volume = 0; break;
-      case 0x5: grab_volume = 0; break;
-      case 0x6: grab_volume = 0; break;
-      case 0x7: grab_volume = 0; break;
-    }
-  }
-
 #endif
-
 }
+
 
 
 
@@ -1092,29 +682,20 @@ void mcuStatusChange()
         // (mirrors disableInterruptOnCLK() in the original SW SPI implementation)
         if (SPI1->regs->SR & SPI_SR_RXNE) {
             uint8_t b = (uint8_t)SPI1->regs->DR;
-            dbg_last_byte = b;
-            dbg_spi_rxne_poll++;
             panel_message.write(b);
-            if (panel_message.wbp == howmanybytesinpacket) {
-                panel_message.wbp = 0; // overflow guard — matches original disableInterruptOnCLK
-#ifdef USE_SERIAL
-                dbg_last_byte = 0xEE;  // sentinel: wbp overflow detected
-#endif
-            }
+            if (panel_message.wbp == howmanybytesinpacket)
+                panel_message.wbp = 0; // overflow guard
         }
 
         if (digitalRead(mcuCLK)) {
-            dbg_status_rising_h++;   // CLK HIGH = end of packet
             panel_message.commit();
             panel_message.busy = 0;
-        } else {
-            dbg_status_rising_l++;   // CLK LOW = more bytes coming (busy stays 1)
         }
+        // else: CLK LOW = more bytes coming, busy stays 1
     } else {
         // STATUS FALLING → select SPI1 (new byte starting)
-        dbg_status_falling++;
         digitalWrite(mcuCS, HIGH);  // PA3 HIGH → inverter → NSS LOW
-        panel_message.busy = 1;     // block loop() from reading incomplete packet
+        panel_message.busy = 1;
     }
 }
 #endif // HWV5
@@ -1193,41 +774,17 @@ void receiveEvent (int howMany)
 
 
 void sendI2C (uint8_t data[howmanybytesinpacket]) {
-#ifdef USE_SERIAL
- // decode_i2c(data);
-#endif
-  //  int timeout_us = 5000;
-  //  while (!i2c_start((I2C_7BITADDR << 1) | I2C_WRITE) && timeout_us > 0) {
-  //    delayMicroseconds(20);
-  //    timeout_us -= 20;
-  //  }
-  //
-  //  if (timeout_us <= 0) { // start transfer
-  //     USEDSERIAL.println(F("I2C device busy");
-  //    return;
-  //  }
-
   SWire.beginTransmission(MY_ADDRESS); // transmit to device
-
-  //  USEDSERIAL.print(F("size: ");
-  //  USEDSERIAL.println(data[0]);
 
   for (byte i = 0 ; i < data[0]; i++) {
     //i2c_write(data[i + 1]);
     while (!SWire.write(data[i + 1])) {
-      //test delay(10);
     }              // sends one byte
-
-    // USEDSERIAL.print(data[i + 1], HEX);
-    // USEDSERIAL.print(F(" ");
   }
-  //i2c_stop(); // send stop condition
   SWire.endTransmission();    // stop transmitting
-  // USEDSERIAL.println();
-  // decode_i2c(data);
 }
 
-
+/*
 #ifdef USE_SERIAL
 void decode_i2c(uint8_t data[howmanybytesinpacket]) {
   uint8_t increments = 1; //at least 1 iteration of next FOR must run...
@@ -1496,124 +1053,4 @@ void spk_atten(uint8_t c) {
   }
 }
 
-void decode_button_push(uint8_t data) {
-  // verbose decode replaced with raw hex for debug session
-  USEDSERIAL.print(F("BTN: 0x")); USEDSERIAL.println(data, HEX);
-  if (false) { switch (data) {
-    case PANEL_1:
-      USEDSERIAL.println(F(" 1"));
-      break;
-    case PANEL_2:
-      USEDSERIAL.println(F(" 2"));
-      break;
-    case PANEL_3:
-      USEDSERIAL.println(F(" 3"));
-      break;
-    case PANEL_4:
-      USEDSERIAL.println(F(" 4"));
-      break;
-    case PANEL_5:
-      USEDSERIAL.println(F(" 5"));
-      break;
-    case PANEL_6:
-      USEDSERIAL.println(F(" 6"));
-      break;
-    case PANEL_SEEK_UP:
-      USEDSERIAL.println(F(" Seek > "));
-      break;
-    case PANEL_TP:
-      USEDSERIAL.println(F(" TP"));
-      break;
-    case PANEL_RDS:
-      USEDSERIAL.println(F(" RDS"));
-      break;
-    case PANEL_CPS:
-      USEDSERIAL.println(F(" CPS"));
-      break;
-    case PANEL_MODE:
-      USEDSERIAL.println(F(" MODE"));
-      break;
-    case PANEL_RD:
-      USEDSERIAL.println(F(" RD(random ? )"));
-      break;
-    case PANEL_PREVIOUS_TRACK:
-      USEDSERIAL.println(F(" << "));
-      break;
-    case PANEL_FADE:
-      USEDSERIAL.println(F(" FAD"));
-      break;
-    case PANEL_BALANCE:
-      USEDSERIAL.println(F(" BALANCE"));
-      break;
-    case PANEL_BASS:
-      USEDSERIAL.println(F(" BASS"));
-      break;
-    case PANEL_AM:
-      USEDSERIAL.println(F(" AM"));
-      break;
-    case PANEL_DOLBY:
-      USEDSERIAL.println(F(" Dolby"));
-      break;
-    case PANEL_NEXT_TRACK:
-      USEDSERIAL.println(F(" >>"));
-      break;
-    case PANEL_TREBLE:
-      USEDSERIAL.println(F(" TREB"));
-      break;
-    case PANEL_AS:
-      USEDSERIAL.println(F(" AS"));
-      break;
-    case PANEL_SCAN:
-      USEDSERIAL.println(F(" SCAN"));
-      break;
-    case PANEL_FM:
-      USEDSERIAL.println(F(" FM"));
-      break;
-    case PANEL_SEEK_DOWN:
-      USEDSERIAL.println(F(" Seek < "));
-      break;
-    case PANEL_REVERSE:
-      USEDSERIAL.println(F(" REV"));
-      break;
-    case PANEL_KNOB_UP:
-      USEDSERIAL.println(F(" Knob + "));
-      break;
-    case PANEL_KNOB_DOWN:
-      USEDSERIAL.println(F(" Knob - "));
-      break;
-    case PANEL_CODE_IN:
-      USEDSERIAL.println(F(" Code in (TP + RDS)"));
-      break;
-    case PANEL_EJECT:
-      USEDSERIAL.println(F("eject"));
-      break;
-    case PANEL_BUTTON_RELEASE:
-      USEDSERIAL.println(F("button release"));
-      break;
-    case PANEL_REMOTE_VOLUME_UP:
-      USEDSERIAL.println(F("Remote volume up"));
-      break;
-    case PANEL_REMOTE_VOLUME_DOWN:
-      USEDSERIAL.println(F("Remote volume down"));
-      break;
-    case PANEL_REMOTE_RIGHT:
-      USEDSERIAL.println(F("Remote right"));
-      break;
-    case PANEL_REMOTE_LEFT:
-      USEDSERIAL.println(F("Remote left"));
-      break;
-    case PANEL_REMOTE_UP:
-      USEDSERIAL.println(F("Remote up"));
-      break;
-    case PANEL_REMOTE_DOWN:
-      USEDSERIAL.println(F("Remote down"));
-      break;
-    case PANEL_START:
-      USEDSERIAL.println(F("Panel start"));
-      break;
-    default:
-      USEDSERIAL.print(F("Unknown button pushed: "));  USEDSERIAL.println(data, HEX);
-      break;
-  } } // end if(false)
-}
-#endif
+*/

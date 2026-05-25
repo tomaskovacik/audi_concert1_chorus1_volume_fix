@@ -281,13 +281,13 @@ void setup ()
   pinMode(mcuCS, OUTPUT);            // PA3: hw-inverted PA15
   digitalWrite(mcuCS, LOW);          // STATUS HIGH → CS LOW
   SPI.begin();                       // configure PA5/PA6/PA7 as SPI1 AF pins
-  SPI1->CR1 &= ~SPI_CR1_SPE;
-  SPI1->CR1 &= ~SPI_CR1_MSTR;       // slave mode
-  SPI1->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI; // software NSS; CPOL=0 CPHA=0 (MODE 0)
-  SPI1->CR1 |= SPI_CR1_SPE;
-  SPI1->DR   = 0x00;                 // pre-load MISO idle value
-  SPI1->CR2 |= SPI_CR2_RXNEIE;      // fire SPI1_IRQHandler on each received byte
-  NVIC_EnableIRQ(SPI1_IRQn);
+  SPI1->regs->CR1 &= ~SPI_CR1_SPE;
+  SPI1->regs->CR1 &= ~SPI_CR1_MSTR; // slave mode
+  SPI1->regs->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI; // software NSS; CPOL=0 CPHA=0 (MODE 0)
+  SPI1->regs->CR1 |= SPI_CR1_SPE;
+  SPI1->regs->DR   = 0x00;          // pre-load MISO idle value
+  SPI1->regs->CR2 |= SPI_CR2_RXNEIE; // fire __irq_spi1 on each received byte
+  nvic_irq_enable(NVIC_SPI1);
   pinMode(displayRESET, INPUT);
   //init interrupt on STATUS line to grab data sent between display and main CPU
 
@@ -1041,10 +1041,10 @@ void mcuClkChange()
         digitalWrite(mcuSTATUS, LOW);
         digitalWrite(mcuSTATUS, HIGH);
         digitalWrite(mcuCS, LOW);
-        if (SPI1->SR & SPI_SR_RXNE) (void)SPI1->DR; // flush stale byte
+        if (SPI1->regs->SR & SPI_SR_RXNE) (void)SPI1->regs->DR; // flush stale byte
     } else {
-        if (SPI1->SR & SPI_SR_RXNE)
-            panel_message.write((uint8_t)SPI1->DR);
+        if (SPI1->regs->SR & SPI_SR_RXNE)
+            panel_message.write((uint8_t)SPI1->regs->DR);
         panel_message.commit();
         panel_message.busy = 0;
         digitalWrite(mcuSTATUS, HIGH);
@@ -1054,18 +1054,17 @@ void mcuClkChange()
 
 inline void spi1ByteReceived()
 {
-    panel_message.write((uint8_t)SPI1->DR);
-    SPI1->DR = 0x00;
+    panel_message.write((uint8_t)SPI1->regs->DR);
+    SPI1->regs->DR = 0x00;
     digitalWrite(mcuCS, HIGH);
     digitalWrite(mcuSTATUS, LOW);
     digitalWrite(mcuSTATUS, HIGH);
     digitalWrite(mcuCS, LOW);
 }
 
-extern "C" void SPI1_IRQHandler(void) __attribute__((interrupt("IRQ")));
-extern "C" void SPI1_IRQHandler(void)
+extern "C" void __irq_spi1(void)
 {
-    if (SPI1->SR & SPI_SR_RXNE) spi1ByteReceived();
+    if (SPI1->regs->SR & SPI_SR_RXNE) spi1ByteReceived();
 }
 #endif // HWV5
 

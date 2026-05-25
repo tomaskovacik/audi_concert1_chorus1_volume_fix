@@ -161,7 +161,7 @@ volatile uint8_t _byte; //temporary, incoming byte is shiffted here, then when w
 volatile uint8_t dbg_status_rising_h = 0; // enableInterruptOnCLK: CLK HIGH (end-of-packet)
 volatile uint8_t dbg_status_rising_l = 0; // enableInterruptOnCLK: CLK LOW  (byte start)
 volatile uint8_t dbg_status_falling  = 0; // disableInterruptOnCLK fires
-volatile uint8_t dbg_spi_rxne_count  = 0; // __irq_spi1 RXNE fires
+volatile uint8_t dbg_spi_rxne_poll   = 0; // SPI1 SR RXNE seen in loop() polling
 volatile uint8_t dbg_last_byte       = 0; // last byte from SPI1
 
 volatile uint8_t start_volume = 0xBA; //was 0xE4- set it 4leves lower, some complaints from BOSE users ..
@@ -277,30 +277,36 @@ void setup ()
   //    volume_packet[i] = 0;
   //    loudness_packet[i] = 0;
   //  }
-  // HWV5: STATUS CHANGE ISR mirrors STATUS→PA3→(HW inverter)→SPI1_NSS(PA4).
-  // Each STATUS LOW→HIGH pulse resets the SPI1 shift register via NSS,
-  // giving clean per-byte alignment without any software bit-counter reset.
+  // HWV5 passive sniffer: SPI1 slave always-selected (SSM=1/SSI=1, no NSS pin).
+  // STATUS ISR only tracks packet boundaries; bytes are polled in loop().
   pinMode(mcuSTATUS, INPUT_PULLUP);
-  pinMode(mcuCS, OUTPUT);
-  digitalWrite(mcuCS, digitalRead(mcuSTATUS));   // sync PA3 with current STATUS level
   attachInterrupt(digitalPinToInterrupt(mcuSTATUS), mcuStatusChange, CHANGE);
-  SPI.begin();                                    // enable SPI1 RCC clock + initial AF setup
-  SPI1->regs->CR1 &= ~SPI_CR1_SPE;
-  SPI1->regs->CR1 &= ~(SPI_CR1_MSTR | SPI_CR1_SSM | SPI_CR1_SSI); // slave, hardware NSS
-  // Fix GPIO to INPUT before re-enabling SPI1 so the peripheral sees a clean input
-  gpio_set_mode(GPIOA, 4, GPIO_INPUT_FLOATING);  // PA4/NSS: driven via PA3→inverter on PCB
-  gpio_set_mode(GPIOA, 5, GPIO_INPUT_FLOATING);  // PA5/SCK: must be INPUT for slave
-  gpio_set_mode(GPIOA, 7, GPIO_INPUT_FLOATING);  // PA7/MOSI: must be INPUT for slave
+
+  // Enable SPI1 and AFIO clocks directly (SPI.begin() may target SPI2 on some cores).
+  // RCC APB2ENR (0x40021018): bit 0 = AFIOEN, bit 12 = SPI1EN
+  volatile uint32_t *rcc_apb2enr = (volatile uint32_t*)0x40021018;
+  *rcc_apb2enr |= (1u << 0) | (1u << 12);
+  // Clear AFIO SPI1_REMAP (bit 0 of AFIO_MAPR) → default pins PA4-PA7
+  volatile uint32_t *afio_mapr = (volatile uint32_t*)0x40010004;
+  *afio_mapr &= ~(1u << 0);
+
+  // PA5/SCK and PA7/MOSI must be INPUT before enabling SPI1
+  gpio_set_mode(GPIOA, 5, GPIO_INPUT_FLOATING);
+  gpio_set_mode(GPIOA, 7, GPIO_INPUT_FLOATING);
+
+  // SPI1 slave: SSM=1/SSI=1 → always selected (no NSS pin), MODE 0, 8-bit
+  SPI1->regs->CR1 = SPI_CR1_SSM | SPI_CR1_SSI;  // MSTR=0, CPOL=0, CPHA=0
   SPI1->regs->CR1 |= SPI_CR1_SPE;
-  SPI1->regs->CR2 |= SPI_CR2_RXNEIE;
-  nvic_irq_enable(NVIC_SPI1);
+  SPI1->regs->CR2 = 0;  // no interrupts; loop() polls SR
+
   pinMode(displayRESET, INPUT);
-  //init interrupt on STATUS line to grab data sent between display and main CPU
 
   //serial for debug
 #ifdef USE_SERIAL
   USEDSERIAL.begin(115200);
-  USEDSERIAL.println(F("HWV5 passive SPI1 ready"));
+  USEDSERIAL.print(F("HWV5 SPI1 CR1=0x")); USEDSERIAL.print(SPI1->regs->CR1, HEX);
+  USEDSERIAL.print(F(" CR2=0x")); USEDSERIAL.print(SPI1->regs->CR2, HEX);
+  USEDSERIAL.print(F(" AFIO=0x")); USEDSERIAL.println(*afio_mapr, HEX);
 #endif
   //arduino
   //      if (!i2c_init()) // Initialize everything and check for bus lockup
@@ -322,18 +328,27 @@ void printInfo() {
 void loop()
 {
 #ifdef USE_SERIAL
+  // Poll SPI1 RXNE — passive byte reception, no ISR needed
+  if (SPI1->regs->SR & SPI_SR_RXNE) {
+    uint8_t b = (uint8_t)SPI1->regs->DR;
+    dbg_last_byte = b;
+    dbg_spi_rxne_poll++;
+    if (panel_message.busy)
+      panel_message.write(b);
+  }
+
   // Print once whenever any diagnostic counter changes
   {
-    static uint8_t _h, _l, _f, _r;
+    static uint8_t _h, _l, _f, _p;
     if (dbg_status_rising_h != _h || dbg_status_rising_l != _l ||
-        dbg_status_falling != _f || dbg_spi_rxne_count != _r) {
+        dbg_status_falling != _f || dbg_spi_rxne_poll != _p) {
       USEDSERIAL.print(F("STA^H=")); USEDSERIAL.print(dbg_status_rising_h);
       USEDSERIAL.print(F(" L="));    USEDSERIAL.print(dbg_status_rising_l);
       USEDSERIAL.print(F(" STA_="));  USEDSERIAL.print(dbg_status_falling);
-      USEDSERIAL.print(F(" RXNE=")); USEDSERIAL.print(dbg_spi_rxne_count);
+      USEDSERIAL.print(F(" POLL=")); USEDSERIAL.print(dbg_spi_rxne_poll);
       USEDSERIAL.print(F(" byte=0x")); USEDSERIAL.println(dbg_last_byte, HEX);
       _h = dbg_status_rising_h; _l = dbg_status_rising_l;
-      _f = dbg_status_falling;  _r = dbg_spi_rxne_count;
+      _f = dbg_status_falling;  _p = dbg_spi_rxne_poll;
     }
   }
   if (Serial.available()) {
@@ -1057,42 +1072,23 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 
 
 
-// ── HWV5 STATUS CHANGE + SPI1 RXNE ISRs ─────────────────────────────────────
-// mcuStatusChange mirrors STATUS to PA3 → HW inverter → SPI1_NSS (PA4).
-// STATUS RISING  → NSS LOW  → SPI1 selected → starts counting 8 CLK edges.
-// STATUS FALLING → NSS HIGH → SPI1 deselected → shift register resets for next byte.
-// __irq_spi1 fires on RXNE (8 CLK edges received) and stores the byte in _byte.
+// ── HWV5 passive SPI1 sniffer ────────────────────────────────────────────────
+// SPI1 is always-selected (SSM=1/SSI=1); bytes arrive on PA5/PA7 without any
+// NSS management.  STATUS ISR only tracks packet boundaries; loop() polls RXNE.
 #ifdef HWV5
 void mcuStatusChange()
 {
     if (digitalRead(mcuSTATUS)) {
-        // STATUS RISING: PA3 HIGH → (inverter) → NSS LOW → SPI1 active
-        digitalWrite(mcuCS, HIGH);
         if (digitalRead(mcuCLK)) {
-            dbg_status_rising_h++;   // CLK HIGH = end of packet
+            dbg_status_rising_h++;   // STATUS RISING + CLK HIGH = end of packet
             panel_message.commit();
             panel_message.busy = 0;
         } else {
-            dbg_status_rising_l++;   // CLK LOW = byte about to start
+            dbg_status_rising_l++;   // STATUS RISING + CLK LOW = byte start
             panel_message.busy = 1;
         }
     } else {
-        // STATUS FALLING: PA3 LOW → (inverter) → NSS HIGH → SPI1 deselected
-        dbg_status_falling++;
-        digitalWrite(mcuCS, LOW);
-        // Read DR directly in case __irq_spi1 hasn't run yet (race with ISR priority)
-        if (SPI1->regs->SR & SPI_SR_RXNE)
-            _byte = (uint8_t)SPI1->regs->DR;
-        panel_message.write(_byte);
-    }
-}
-
-extern "C" void __irq_spi1(void)
-{
-    if (SPI1->regs->SR & SPI_SR_RXNE) {
-        _byte = (uint8_t)SPI1->regs->DR;
-        dbg_last_byte = _byte;
-        dbg_spi_rxne_count++;
+        dbg_status_falling++;        // STATUS FALLING = byte done
     }
 }
 #endif // HWV5

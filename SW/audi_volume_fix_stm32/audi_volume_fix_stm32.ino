@@ -72,12 +72,11 @@ struct CircularPacketBuffer {
 
   bool available() const { return rdp != wdp; }
 
-  // Copy the current read packet into dst[], clear the slot, then advance rdp
+  // Copy the current read packet into dst[] then advance rdp.
+  // No zero-fill needed — commit() zero-fills on write.
   void read(uint8_t dst[]) {
     for (uint8_t i = 0; i < howmanybytesinpacket; i++)
       dst[i] = buf[PACKET_IDX(rdp, i)];
-    for (uint8_t i = 0; i < howmanybytesinpacket; i++)
-      buf[PACKET_IDX(rdp, i)] = 0;
     if (++rdp == howmanypackets) rdp = 0;
   }
 
@@ -121,14 +120,14 @@ volatile uint8_t current_loudness = start_loudness;
 
 volatile uint8_t grab_volume = 1;
 
-volatile uint8_t mute = 0;
-volatile uint8_t in_volume_recalc = 0;
+volatile bool mute = false;
+volatile bool in_volume_recalc = false;
 
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
 
-void sendI2C(uint8_t data[howmanybytesinpacket]);
+void sendI2C(const uint8_t data[howmanybytesinpacket]);
 
 
 void set_volume();
@@ -241,7 +240,7 @@ void loop()
       } else if (_data[1] == 8) { // MUTE
         if ((_data[2] & B00000001)) {
           if (!mute && !in_volume_recalc) {
-            mute = 1;
+            mute = true;
             saved_volume = current_volume;
             volume = 0xFF;
             set_volume();
@@ -249,7 +248,7 @@ void loop()
           sendI2C(_data);
         } else {
           if (mute) {
-            mute = 0;
+            mute = false;
             volume = saved_volume;
             set_volume();
           }
@@ -267,8 +266,8 @@ void loop()
 */
 void set_mute() {
   if (!mute) {
-    mute = 1;
-    uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    mute = true;
+    static const uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x81, 0};
     sendI2C(mute_data);
   }
 }
@@ -277,9 +276,9 @@ void set_mute() {
 */
 void set_unmute() {
   if (mute) {
-    mute = 0;
-    uint8_t mute_data[howmanybytesinpacket] = {0x02, 0x08, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    sendI2C(mute_data);
+    mute = false;
+    static const uint8_t unmute_data[howmanybytesinpacket] = {0x02, 0x08, 0x80, 0};
+    sendI2C(unmute_data);
   }
 }
 
@@ -300,7 +299,7 @@ static const uint8_t vol_down_levels[] = {
 };
 
 void set_volume_up() {
-  in_volume_recalc = 1;
+  in_volume_recalc = true;
   for (uint8_t i = 0; i < sizeof(vol_up_levels); i++) {
     if (volume > vol_up_levels[i]) {
       volume = vol_up_levels[i];
@@ -311,7 +310,7 @@ void set_volume_up() {
 }
 
 void set_volume_down() {
-  in_volume_recalc = 1;
+  in_volume_recalc = true;
   for (int8_t i = (int8_t)sizeof(vol_down_levels) - 1; i >= 0; i--) {
     if (volume < vol_down_levels[i]) {
       volume = vol_down_levels[i];
@@ -324,26 +323,18 @@ void set_volume() {
   if (volume == 0xFF && !mute) saved_volume = current_volume;
 
   while (volume != current_volume) {
-
-    if (current_volume > volume) {
-      if ((current_volume - volume) == 1) current_volume = volume;
-      else current_volume = current_volume - 2;
-      volume_packet[2] = current_volume;
-      set_loudness();
-      sendI2C(volume_packet);
-    }
-    if (current_volume < volume) {
-      if ((volume - current_volume) == 1) current_volume = volume;
-      else current_volume = current_volume + 2;
-      volume_packet[2] = current_volume;
-      set_loudness();
-      sendI2C(volume_packet);
-    }
+    if (current_volume > volume)
+      current_volume -= (current_volume - volume == 1) ? 1 : 2;
+    else
+      current_volume += (volume - current_volume == 1) ? 1 : 2;
+    volume_packet[2] = current_volume;
+    set_loudness();
+    sendI2C(volume_packet);
   }
 
   if (volume == 0xFF) set_mute();
   if (volume < 0xFE) set_unmute();
-  in_volume_recalc = 0;
+  in_volume_recalc = false;
 }
 
 void set_loudness()
@@ -461,7 +452,7 @@ void receiveEvent (int howMany)
   i2c_data.busy = 0;
 }
 
-void sendI2C (uint8_t data[howmanybytesinpacket]) {
+void sendI2C (const uint8_t data[howmanybytesinpacket]) {
   SWire.beginTransmission(MY_ADDRESS);
 
   for (byte i = 0 ; i < data[0]; i++) {

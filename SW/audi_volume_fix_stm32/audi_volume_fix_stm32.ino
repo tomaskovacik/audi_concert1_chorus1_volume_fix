@@ -1,20 +1,12 @@
-// - master for HW 
-// HWv1 and HWv2 without any #define regarding HW version
-// HWv3 with #define HWV3
-// HWv4 with #define HWV4
-// HWv5 with #define HWV5
-// module is held in reset state when front panel is off, no last volume is stored ...
+// HWv5 — passive SPI sniffer for Audi Concert1/Chorus1 volume fix
+// module is held in reset state when front panel is off, no last volume is stored
 
 /* version 5 — passive sniffer (same role as HWv1-v4, CLK/DATA via SPI1 peripheral)
 mcuCLK    = PA5  (SPI1_SCK  - input, MCU drives CLK)
 mcuDATA   = PA7  (SPI1_MOSI - input, shared DATA via resistors)
 mcuSTATUS = PA15 (input, panel drives STATUS)
 */
-#define HWV5
-
-#ifdef HWV5
 #include <SPI.h>
-#endif
 #include <Wire_slave.h>
 
 #include <FlexWire.h>
@@ -44,27 +36,12 @@ FlexWire SWire = FlexWire(PB11, PB10);
     more data to come.
 
 */
-#ifdef HWV5
 #define mcuCLK    PA5  // SPI1_SCK  - MCU drives CLK (input, passive sniff)
 #define mcuDATA   PA7  // SPI1_MOSI - shared DATA via resistors (input, passive sniff)
 #define mcuCS     PA3  // output: mirrors STATUS → HW inverter → SPI1_NSS (PA4)
-#else
-#define mcuCLK PB3 //CLK
-#define mcuDATA PB4//DATA
-#endif
-#ifdef HWV3
-#define mcuSTATUS PA4 //STATUS/CS
-#define VERSION "1.0-09.06.22-HWv3"
-#else//hw v4 and v5
-#define mcuSTATUS PA15 //STATUS/CS
-#define VERSION "2.0-25.05.26-HWv4"
-#endif
-#if defined(HWV5) || defined(HWV4) || defined(HWV3)
+#define mcuSTATUS PA15
 #define displayRESET PB8
-#else
-#define VERSION "1.0-09.06.22"
-#define displayRESET PB5
-#endif
+#define VERSION "2.0-25.05.26-HWv5"
 
 //we are trying to interface with communication to TDA7342 which is 0x44 so...
 #define I2C_7BITADDR 0x44
@@ -131,8 +108,6 @@ volatile uint8_t _i2c_data_buf[howmanypackets * howmanybytesinpacket];  // I2C d
 CircularPacketBuffer panel_message = { _panel_msg_buf, 0, 0, 0, false }; // SPI front panel messages
 CircularPacketBuffer i2c_data      = { _i2c_data_buf,  0, 0, 0, false }; // I2C packets from MCU
 
-volatile uint8_t _byte;
-
 volatile uint8_t start_volume = 0xBA;
 
 volatile uint8_t volume = start_volume;
@@ -152,23 +127,16 @@ volatile uint8_t in_volume_recalc = 0;
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
 
-uint8_t displayRESETstate = 0;
 
 void sendI2C(uint8_t data[howmanybytesinpacket]);
 
-void decode_i2c(uint8_t data[howmanybytesinpacket]);
 
 void set_volume();
 void set_loudness();
 
-void enableInterruptOnCLK();
-
-void disableInterruptOnCLK();
-
-void readCLK();
-
 void set_mute();
 void set_unmute();
+void receiveEvent(int howMany);
 
 void setup ()
 {
@@ -180,7 +148,7 @@ void setup ()
   Wire.onReceive (receiveEvent);
   SWire.begin();
 
-  // HWV5 passive sniffer: STATUS ISR gates NSS (PA3→PA4/NSS) so
+  // STATUS ISR gates NSS (PA3→PA4/NSS) so
   pinMode(mcuSTATUS, INPUT_PULLUP);
   pinMode(mcuCS, OUTPUT);
   digitalWrite(mcuCS, !digitalRead(mcuSTATUS));
@@ -451,15 +419,8 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 #endif
 }
 
-// ── HWV5 passive SPI1 sniffer ────────────────────────────────────────────────
 // STATUS LOW  → NSS LOW  → SPI1 selected → counts 8 CLK edges → RXNE set.
 // STATUS HIGH → NSS HIGH → SPI1 deselected → byte complete, read DR here in ISR.
-// Reading DR in the ISR (not loop()) avoids the race where loop() is busy with
-// Serial output and the SPI DR gets overwritten before it can be read.
-// Two bugs fixed vs. polling approach:
-//  1. Last byte of packet was always dropped (busy=0 set before loop() read RXNE).
-//  2. Middle bytes were dropped when Serial print kept loop() busy too long.
-#ifdef HWV5
 void mcuStatusChange()
 {
     if (digitalRead(mcuSTATUS)) {
@@ -467,7 +428,6 @@ void mcuStatusChange()
         digitalWrite(mcuCS, LOW);   // PA3 LOW → inverter → NSS HIGH
 
         // Harvest the completed byte immediately — before loop() gets a chance to run
-        // (mirrors disableInterruptOnCLK() in the original SW SPI implementation)
         if (SPI1->regs->SR & SPI_SR_RXNE) {
             uint8_t b = (uint8_t)SPI1->regs->DR;
             panel_message.write(b);
@@ -485,55 +445,6 @@ void mcuStatusChange()
         digitalWrite(mcuCS, HIGH);  // PA3 HIGH → inverter → NSS LOW
         panel_message.busy = 1;
     }
-}
-#endif // HWV5
-
-//enable RISING interrupt on CLK line when STATUS line rises (non-HWV5 passive sniffing)
-void enableInterruptOnCLK()
-{
-  if (digitalRead(mcuCLK)) {
-    detachInterrupt(digitalPinToInterrupt(mcuSTATUS));
-    panel_message.commit();
-    attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInterruptOnCLK, RISING);
-    panel_message.busy = 0;
-  } else {
-    attachInterrupt(digitalPinToInterrupt(mcuSTATUS), disableInterruptOnCLK, FALLING);
-    _byte = 0;
-    panel_message.busy = 1;
-#ifdef HWV5
-    // Reset SPI1 shift register so it aligns on the next byte's 8 CLK edges
-    SPI1->regs->CR1 &= ~SPI_CR1_SPE;
-    if (SPI1->regs->SR & SPI_SR_RXNE) (void)SPI1->regs->DR;
-    SPI1->regs->CR1 |= SPI_CR1_SPE;
-#else
-    attachInterrupt(digitalPinToInterrupt(mcuCLK), readCLK, RISING);
-#endif
-  }
-}
-
-//disable CLK interrupt while STATUS is low
-void disableInterruptOnCLK()
-{
-#ifndef HWV5
-  detachInterrupt(digitalPinToInterrupt(mcuCLK));
-#endif
-  panel_message.write(_byte);
-  if (panel_message.wbp == howmanybytesinpacket) {
-    panel_message.wbp = 0;
-#ifdef USE_SERIAL
-    USEDSERIAL.println(F("dwbp overflow"));
-#endif
-  }
-  attachInterrupt(digitalPinToInterrupt(mcuSTATUS), enableInterruptOnCLK, RISING);
-}
-
-void readCLK()
-{
-  if (digitalRead(mcuDATA)) {
-    _byte = (_byte << 1) | 1;
-  } else {
-    _byte = (_byte << 1);
-  }
 }
 
 // called by interrupt service routine when incoming data arrives

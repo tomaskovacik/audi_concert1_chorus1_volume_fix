@@ -11,10 +11,10 @@
 //   I2C master   = A2 (SDA), A3 (SCL) — SlowSoftWire, sends fixed data to TDA7342
 
 #include <Wire.h>
-#include <SlowSoftWire.h>
+#include <FlexWire.h>
 #include "audi_concert_panel.h"
 
-SlowSoftWire SWire = SlowSoftWire(A2, A3);
+FlexWire SWire = FlexWire(A2, A3);
 
 #define USE_SERIAL
 #define USEDSERIAL Serial

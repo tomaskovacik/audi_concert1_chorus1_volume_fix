@@ -134,28 +134,24 @@ volatile uint8_t _i2c_data_buf[howmanypackets * howmanybytesinpacket];  // I2C d
 CircularPacketBuffer panel_message = { _panel_msg_buf, 0, 0, 0, false }; // SPI front panel messages
 CircularPacketBuffer i2c_data      = { _i2c_data_buf,  0, 0, 0, false }; // I2C packets from MCU
 
-volatile uint8_t start_volume = 0xBA;
+Config cfg;  // loaded once in setup(), updated on serial command
 
-volatile uint8_t volume = start_volume;
-volatile uint8_t current_volume = start_volume;
-volatile uint8_t saved_volume = start_volume;
+volatile uint8_t volume         = 0xBA;
+volatile uint8_t current_volume = 0xBA;
+volatile uint8_t saved_volume   = 0xBA;
 
-volatile uint8_t start_loudness = 0x0E;
+volatile uint8_t loudness         = 0x0E;
+volatile uint8_t current_loudness = 0x0E;
 
-volatile uint8_t loudness = start_loudness;
-volatile uint8_t current_loudness = start_loudness;
-
-volatile uint8_t grab_volume = 1;
-
-volatile bool mute = false;
+volatile bool grab_volume    = true;
+volatile bool mute           = false;
 volatile bool in_volume_recalc = false;
 
 // GALA state
 volatile uint16_t gala_captime = 0;  // pulse width in µs (filled by ISR)
 uint16_t gala_prev_speed = 0;
 
-// displayRESET edge tracking
-uint8_t displayRESETstate = 0;
+bool displayRESETstate = false;
 
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
@@ -226,11 +222,9 @@ void galaFalling() {
 void setup ()
 {
   // Load config from flash and apply start volume
-  Config cfg = readConfig();
-  start_volume = volLevelToHex(cfg.vol);
-  volume = start_volume;
-  current_volume = start_volume;
-  saved_volume = start_volume;
+  cfg = readConfig();
+  uint8_t sv = volLevelToHex(cfg.vol);
+  volume = current_volume = saved_volume = sv;
 
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;
@@ -287,7 +281,6 @@ void setup ()
 }  // end of setup
 
 void printInfo() {
-  Config cfg = readConfig();
   USEDSERIAL.print(F("Firmware version: "));
   USEDSERIAL.println(F(VERSION));
   USEDSERIAL.println(F("(C) kovo, GPL3"));
@@ -307,7 +300,6 @@ void loop()
 #ifdef USE_SERIAL
   if (USEDSERIAL.available()) {
     char ch = USEDSERIAL.read();
-    Config cfg = readConfig();
     bool changed = false;
     if (ch == 'v' || ch == 'V' || ch == 'h' || ch == 'H' || ch == '?') {
       printInfo();
@@ -330,20 +322,17 @@ void loop()
 #endif
 
   // displayRESET edge: reload start volume from config when radio panel wakes up
-  uint8_t rst = digitalRead(displayRESET);
+  bool rst = digitalRead(displayRESET);
   if (rst && !displayRESETstate) {
-    displayRESETstate = 1;
-    Config cfg = readConfig();
-    start_volume = volLevelToHex(cfg.vol);
-    volume = start_volume;
-    current_volume = start_volume;
-    saved_volume = start_volume;
+    displayRESETstate = true;
+    uint8_t sv = volLevelToHex(cfg.vol);
+    volume = current_volume = saved_volume = sv;
 #ifdef USE_SERIAL
     USEDSERIAL.println(F("Reset HIGH — reloaded start volume"));
 #endif
   }
   if (!rst && displayRESETstate) {
-    displayRESETstate = 0;
+    displayRESETstate = false;
   }
 
   if (!panel_message.busy) {
@@ -357,11 +346,11 @@ void loop()
       }
 #endif
       if (_data[0] == 0x25) {
-        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) {
+        if (grab_volume && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) {
           set_volume_up();
           set_volume();
         }
-        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) {
+        if (grab_volume && (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) {
           set_volume_down();
           set_volume();
         }
@@ -409,15 +398,14 @@ void loop()
   }
 
   // ── GALA speed-based volume ──────────────────────────────────────────────
-  Config gala_cfg = readConfig();
-  if (gala_cfg.gala > 0 && gala_captime > 0) {
+  if (cfg.gala > 0 && gala_captime > 0) {
     uint16_t ct = gala_captime;
     gala_captime = 0;
     uint16_t cur_speed = (uint16_t)(1000000UL / (2UL * ct));
 
     if (gala_prev_speed != cur_speed) {
       // Speed threshold base and 30 km/h steps: vol up / loudness down as speed rises
-      uint16_t thr = (uint16_t)(100 - (gala_cfg.gala - 1) * 15);
+      uint16_t thr = (uint16_t)(100 - (cfg.gala - 1) * 15);
 
       // Going faster — step volume up and loudness down at each 30 km/h band
       for (uint8_t step = 0; step < 5; step++) {
@@ -442,9 +430,6 @@ void loop()
   }
 }
 
-/*
-   send mute data over i2c
-*/
 void set_mute() {
   if (!mute) {
     mute = true;
@@ -452,9 +437,6 @@ void set_mute() {
     sendI2C(mute_data);
   }
 }
-/*
-   send unmute data over i2c
-*/
 void set_unmute() {
   if (mute) {
     mute = false;
@@ -541,46 +523,25 @@ void set_loudness()
 }
 
 /*
-
-   decoding display data  parameter is array with data packet
-   I try to send just pointer, cose data array is not local, we can access it everywhere
-   but it will get 1% more of storage program and it's probably not faster ...
-
-   packet struckture:
-   1st byte in packet is packet definition or something,.... it's always 0x96
-   2nd byte in packet identified data send in packet:
-          - 0x48 - plain asci data to display
-          - 0x13 - leds on buttons indicating mode/functions
-                  -3th byte: [nan|I|I|I|FM|AS|RDS|REG]
-                              - 5th bit is  "pipe" between FM lethers, which make AM symbol something like F|M
-                              - 6th and 7th bits are same "pipe" which made FM 1 and FM 2 like FM I(I)
-                  - 4th byte: [nan|nan|nan|RD|Dolby|CPS|presets|presets]
-                              - 0th and 1st bit are for stations presets 1,2,3,4,5,6
-                  - 5th byte: LEDS [nan|MODE|AS|SCAN|FM|TP|AM|RDS]
-
-          - 0x32 AM/FM frequency display
-                  - 3th byte:??
-                  - 4th byte: actual freq:
-                      AM mode: (531+(9*4th byte)) in kHz
-                      FM mode: (875+4th byte)/10 in Mhz
-          - 0xA2 CD changer mode
-                 - 3th packet is CD number, in hex (but here it's not important, we have only 6CD)
-                 - 4th packet is Track number, again in hex, but no ABCDEF is used ...
-          - 0x23 - display clear.
-          - 0x61 - TAPE mode (display shows TAPE)
-                   3th byte: 1/2 indicate direction of playback (/\ or \/)
-                             3/4 indicate fast forward or rewind (< or > )
-                             0 indicate eject
-
+   SPI packet structure (0x9A packets):
+   byte 0: 0x9A (packet type)
+   byte 1: subtype:
+     0x48: ASCII display text
+     0x13: button/mode LEDs (bytes 2-4: mode flags)
+     0x32: AM/FM frequency
+     0xA2: CD changer (byte 2: disc, byte 3: track)
+     0x23: display clear
+     0x61: tape mode (byte 2: direction/fwd/rew/eject)
+     0x58: settings menu active
+     0x71: tone/balance menu (byte 2 upper nibble: BAS/TRE/BAL/FAD selector)
 */
 
 void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
-  grab_volume = 1;
+  grab_volume = true;
 
-  // grab_volume logic: suppress volume knob handling while panel shows
-  // bass/treble/balance/fade/volume-setting menus
-  if (_data[1] == 0x58) grab_volume = 0;                    // settings menu text
-  if (_data[1] == 0x71 && (_data[2] >> 4) <= 7) grab_volume = 0; // BAS/TRE/BAL/FAD
+  // Suppress volume knob while panel shows bass/treble/balance/fade/volume menus
+  if (_data[1] == 0x58) grab_volume = false;                    // settings menu text
+  if (_data[1] == 0x71 && (_data[2] >> 4) <= 7) grab_volume = false; // BAS/TRE/BAL/FAD
 
 #ifdef USE_SERIAL
   USEDSERIAL.print(F("SPI"));

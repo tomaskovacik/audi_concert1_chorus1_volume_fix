@@ -189,10 +189,10 @@ static bool writeConfig(Config c) {
   c.crc = c.vol + c.gala + c.ta;
   FLASH_Unlock();
   FLASH_ErasePage(CFG_FLASH_PAGE);
-  const uint16_t *src = (const uint16_t *)&c;
-  uint32_t addr = CFG_FLASH_PAGE;
-  for (uint8_t i = 0; i < (sizeof(Config) + 1) / 2; i++, addr += 2)
-    if (FLASH_ProgramHalfWord(addr, src[i]) != FLASH_COMPLETE) { FLASH_Lock(); return false; }
+  const uint16_t *src_words = (const uint16_t *)&c;
+  uint32_t flash_addr = CFG_FLASH_PAGE;
+  for (uint8_t i = 0; i < (sizeof(Config) + 1) / 2; i++, flash_addr += 2)
+    if (FLASH_ProgramHalfWord(flash_addr, src_words[i]) != FLASH_COMPLETE) { FLASH_Lock(); return false; }
   FLASH_Lock();
   return true;
 }
@@ -223,8 +223,8 @@ void setup ()
 {
   // Load config from flash and apply start volume
   cfg = readConfig();
-  uint8_t sv = volLevelToHex(cfg.vol);
-  volume = current_volume = saved_volume = sv;
+  uint8_t start_vol = volLevelToHex(cfg.vol);
+  volume = current_volume = saved_volume = start_vol;
 
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;
@@ -304,11 +304,11 @@ void loop()
     if (ch == 'v' || ch == 'V' || ch == 'h' || ch == 'H' || ch == '?') {
       printInfo();
     } else if (ch == 's' && USEDSERIAL.available()) {
-      uint8_t lvl = USEDSERIAL.read() - '0';
-      if (lvl >= 1 && lvl <= 5) { cfg.vol = lvl; changed = true; }
+      uint8_t level = USEDSERIAL.read() - '0';
+      if (level >= 1 && level <= 5) { cfg.vol = level; changed = true; }
     } else if (ch == 'g' && USEDSERIAL.available()) {
-      uint8_t lvl = USEDSERIAL.read() - '0';
-      if (lvl <= 5) { cfg.gala = lvl; changed = true; }
+      uint8_t level = USEDSERIAL.read() - '0';
+      if (level <= 5) { cfg.gala = level; changed = true; }
     }
     if (changed) {
       if (writeConfig(cfg)) {
@@ -322,16 +322,16 @@ void loop()
 #endif
 
   // displayRESET edge: reload start volume from config when radio panel wakes up
-  bool rst = digitalRead(displayRESET);
-  if (rst && !displayRESETstate) {
+  bool reset_high = digitalRead(displayRESET);
+  if (reset_high && !displayRESETstate) {
     displayRESETstate = true;
-    uint8_t sv = volLevelToHex(cfg.vol);
-    volume = current_volume = saved_volume = sv;
+    uint8_t start_vol = volLevelToHex(cfg.vol);
+    volume = current_volume = saved_volume = start_vol;
 #ifdef USE_SERIAL
     USEDSERIAL.println(F("Reset HIGH — reloaded start volume"));
 #endif
   }
-  if (!rst && displayRESETstate) {
+  if (!reset_high && displayRESETstate) {
     displayRESETstate = false;
   }
 
@@ -399,34 +399,34 @@ void loop()
 
   // ── GALA speed-based volume ──────────────────────────────────────────────
   if (cfg.gala > 0 && gala_captime > 0) {
-    uint16_t ct = gala_captime;
+    uint16_t pulse_width_us = gala_captime;
     gala_captime = 0;
-    uint16_t cur_speed = (uint16_t)(1000000UL / (2UL * ct));
+    uint16_t speed_kmh = (uint16_t)(1000000UL / (2UL * pulse_width_us));
 
-    if (gala_prev_speed != cur_speed) {
+    if (gala_prev_speed != speed_kmh) {
       // Speed threshold base and 30 km/h steps: vol up / loudness down as speed rises
-      uint16_t thr = (uint16_t)(100 - (cfg.gala - 1) * 15);
+      uint16_t base_speed_thr = (uint16_t)(100 - (cfg.gala - 1) * 15);
 
       // Going faster — step volume up and loudness down at each 30 km/h band
-      for (uint8_t step = 0; step < 5; step++) {
-        uint16_t v_thr = thr + step * 30;
-        uint16_t l_thr = v_thr + 15;
-        if (gala_prev_speed <= v_thr && v_thr < cur_speed) {
+      for (uint8_t band = 0; band < 5; band++) {
+        uint16_t vol_speed_thr  = base_speed_thr + band * 30;
+        uint16_t loud_speed_thr = vol_speed_thr + 15;
+        if (gala_prev_speed <= vol_speed_thr && vol_speed_thr < speed_kmh) {
           set_volume_up(); set_volume();
         }
-        if (gala_prev_speed <= l_thr && l_thr < cur_speed && loudness > 0x06) {
+        if (gala_prev_speed <= loud_speed_thr && loud_speed_thr < speed_kmh && loudness > 0x06) {
           loudness--; current_loudness = loudness + 1; set_loudness();
         }
         // Slowing down — step volume down and loudness up
-        if (cur_speed < v_thr && v_thr <= gala_prev_speed) {
+        if (speed_kmh < vol_speed_thr && vol_speed_thr <= gala_prev_speed) {
           set_volume_down(); set_volume();
         }
-        if (cur_speed < l_thr && l_thr <= gala_prev_speed && loudness < 0x0E) {
+        if (speed_kmh < loud_speed_thr && loud_speed_thr <= gala_prev_speed && loudness < 0x0E) {
           loudness++; current_loudness = loudness - 1; set_loudness();
         }
       }
     }
-    gala_prev_speed = cur_speed;
+    gala_prev_speed = speed_kmh;
   }
 }
 
@@ -508,8 +508,8 @@ void set_loudness()
   } else if (volume > 0x5E) {
     loudness = 0x0D;
   } else {
-    int8_t l = 0x0C - (int8_t)((0x5E - volume) / 4);
-    loudness = (l < 0x06) ? 0x06 : (uint8_t)l;
+    int8_t loud_calc = 0x0C - (int8_t)((0x5E - volume) / 4);
+    loudness = (loud_calc < 0x06) ? 0x06 : (uint8_t)loud_calc;
   }
   while (current_loudness != loudness) {
     if (current_loudness < loudness) {
@@ -546,18 +546,18 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
     // "VOL  X  " — start volume level 1-5 (bytes 2-9)
     if (_data[2]=='V' && _data[3]=='O' && _data[4]=='L' && _data[5]==' '
         && _data[6]==' ' && _data[8]==' ' && _data[9]==' ') {
-      uint8_t lvl = _data[7] - '0';
-      if (lvl >= 1 && lvl <= 5) {
-        cfg.vol = lvl;
+      uint8_t level = _data[7] - '0';
+      if (level >= 1 && level <= 5) {
+        cfg.vol = level;
         writeConfig(cfg);
       }
     }
     // "TA   X  " — TA level 1-5
     if (_data[2]=='T' && _data[3]=='A' && _data[4]==' ' && _data[5]==' '
         && _data[6]==' ' && _data[8]==' ' && _data[9]==' ') {
-      uint8_t lvl = _data[7] - '0';
-      if (lvl >= 1 && lvl <= 5) {
-        cfg.ta = lvl;
+      uint8_t level = _data[7] - '0';
+      if (level >= 1 && level <= 5) {
+        cfg.ta = level;
         writeConfig(cfg);
       }
     }
@@ -567,9 +567,9 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
         cfg.gala = 0;
         writeConfig(cfg);
       } else if (_data[8]==' ' && _data[9]==' ') {
-        uint8_t lvl = _data[7] - '0';
-        if (lvl >= 1 && lvl <= 5) {
-          cfg.gala = lvl;
+        uint8_t level = _data[7] - '0';
+        if (level >= 1 && level <= 5) {
+          cfg.gala = level;
           writeConfig(cfg);
         }
       }

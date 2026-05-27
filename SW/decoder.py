@@ -115,6 +115,8 @@ def decode_spi(d):
             0x02: "Tape: Play ▼",
             0x03: "Tape: FF →→",
             0x04: "Tape: RW ←←",
+            0x05: "CONNECT",
+            0x07: "NO CDC",
             0x0B: "SAFE",
             0x10: "TP-INFO",
             0x13: "AS-STORE",

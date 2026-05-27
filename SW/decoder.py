@@ -53,10 +53,12 @@ BASS_TABLE = {
 def decode_spi(d):
     sub = d[1]
     lines = []
+    raw = ' '.join(f'{b:02X}' for b in d)
 
     if sub == 0x13:  # LED indicators
         b2, b3, b4 = d[2], d[3], d[4]
         leds = []
+        # byte 2: [nan|FM2|FM1|FM|AS|RDS|REG] (bit 3 = FM band present)
         if b2 & 0x01: leds.append("REG")
         if b2 & 0x02: leds.append("RDS")
         if b2 & 0x04: leds.append("AS")
@@ -64,10 +66,17 @@ def decode_spi(d):
             if b2 & 0x40: leds.append("FM1")
             if b2 & 0x20: leds.append("FM2")
             if b2 & 0x10: leds.append("AM")
+        # byte 2 unknown bits
+        if b2 & 0x80: leds.append("b2.7?")
+        # byte 3: [?|?|CPS|RD|?|?|presets(2b)]
         mem = b3 & 0x03
-        if b3 & 0x08: leds.append("CPS")
-        if b3 & 0x20: leds.append("Dolby")
+        if b3 & 0x04: leds.append("b3.2?")
+        if b3 & 0x08: leds.append("b3.3?")   # was wrongly "CPS" — actual meaning unknown
         if b3 & 0x10: leds.append("RD")
+        if b3 & 0x20: leds.append("CPS")      # confirmed: lights when CPS active
+        if b3 & 0x40: leds.append("b3.6?")
+        if b3 & 0x80: leds.append("b3.7?")
+        # byte 4: [nan|MODE|AS|SCAN|FM|TP|AM|RDS]
         if b4 & 0x01: leds.append("RDS-led")
         if b4 & 0x02: leds.append("AM-led")
         if b4 & 0x04: leds.append("TP-led")
@@ -75,7 +84,8 @@ def decode_spi(d):
         if b4 & 0x10: leds.append("SCAN-led")
         if b4 & 0x20: leds.append("AS-led")
         if b4 & 0x40: leds.append("MODE-led")
-        lines.append(f"LEDs: {' '.join(leds) or 'none'}  MEM={mem}")
+        if b4 & 0x80: leds.append("b4.7?")
+        lines.append(f"LEDs: {' '.join(leds) or 'none'}  MEM={mem}  [{raw}]")
 
     elif sub == 0x23:
         lines.append("Display CLEAR")
@@ -223,10 +233,13 @@ def handle_line(raw):
         except ValueError:
             print(f"{C}SPI  {raw[4:]}{RST}")
             return
+        hex_str = ' '.join(f'{b:02X}' for b in d)
         decoded = decode_spi(d) if d else []
         if decoded:
             for line in decoded:
-                print(f"{Y}SPI  {line}{RST}")
+                # 0x13 LEDs already embed raw; others get it appended here
+                suffix = f"  [{hex_str}]" if "[" not in line else ""
+                print(f"{Y}SPI  {line}{suffix}{RST}")
         else:
             hex_str = ' '.join(f'{b:02X}' for b in d)
             print(f"{C}SPI  [{hex_str}]{RST}")

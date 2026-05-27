@@ -532,15 +532,50 @@ void set_loudness()
      0xA2: CD changer (byte 2: disc, byte 3: track)
      0x23: display clear
      0x61: tape mode (byte 2: direction/fwd/rew/eject)
-     0x58: settings menu active
+     0x58: settings menu — ASCII text (bytes 2-9), e.g. "VOL  3  ", "GALA 2  ", "GALA OFF"
      0x71: tone/balance menu (byte 2 upper nibble: BAS/TRE/BAL/FAD selector)
 */
 
 void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
   grab_volume = true;
 
-  // Suppress volume knob while panel shows bass/treble/balance/fade/volume menus
-  if (_data[1] == 0x58) grab_volume = false;                    // settings menu text
+  if (_data[1] == 0x58) {
+    // Settings menu: suppress volume knob and auto-save config from display text
+    grab_volume = false;
+
+    // "VOL  X  " — start volume level 1-5 (bytes 2-9)
+    if (_data[2]=='V' && _data[3]=='O' && _data[4]=='L' && _data[5]==' '
+        && _data[6]==' ' && _data[8]==' ' && _data[9]==' ') {
+      uint8_t lvl = _data[7] - '0';
+      if (lvl >= 1 && lvl <= 5) {
+        cfg.vol = lvl;
+        writeConfig(cfg);
+      }
+    }
+    // "TA   X  " — TA level 1-5
+    if (_data[2]=='T' && _data[3]=='A' && _data[4]==' ' && _data[5]==' '
+        && _data[6]==' ' && _data[8]==' ' && _data[9]==' ') {
+      uint8_t lvl = _data[7] - '0';
+      if (lvl >= 1 && lvl <= 5) {
+        cfg.ta = lvl;
+        writeConfig(cfg);
+      }
+    }
+    // "GALA OFF" or "GALA X  " — GALA level 0-5
+    if (_data[2]=='G' && _data[3]=='A' && _data[4]=='L' && _data[5]=='A' && _data[6]==' ') {
+      if (_data[7]=='O' && _data[8]=='F' && _data[9]=='F') {
+        cfg.gala = 0;
+        writeConfig(cfg);
+      } else if (_data[8]==' ' && _data[9]==' ') {
+        uint8_t lvl = _data[7] - '0';
+        if (lvl >= 1 && lvl <= 5) {
+          cfg.gala = lvl;
+          writeConfig(cfg);
+        }
+      }
+    }
+  }
+
   if (_data[1] == 0x71 && (_data[2] >> 4) <= 7) grab_volume = false; // BAS/TRE/BAL/FAD
 
 #ifdef USE_SERIAL

@@ -1,9 +1,150 @@
-Code to fix volume problem on audi concert1/chorus1 units made by blaupunkt, still untested
+# Firmware — Audi Concert1 / Chorus1 volume fix
 
-Schematics:
+STM32F103C6-based firmware that fixes the volume problem on Blaupunkt-made
+Audi Concert 1 / Chorus 1 head units.  Target hardware: **HWv5**.
 
-<img src="https://raw.githubusercontent.com/tomaskovacik/audi_concert1_chorus1_volume_fix/9e00c9a2b6ebaae502b4e7f6c2973995be0e9a08/HW/standalone/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.png">
+---
 
-pdf: https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/blob/master/HW/standalone/audi_concert1_chorus1_volume_fix/audi_concert1_chorus1_volume_fix.pdf
+## Branches
 
+| Branch | Description |
+|---|---|
+| `master` | Stable HWv5 firmware, serial decoder |
+| `feature/eeprom-gala` | Adds persistent config (flash), GALA speed-volume, display auto-save |
 
+---
+
+## Building and flashing
+
+```bash
+cd SW/audi_volume_fix_stm32
+make build    # compile only
+make          # compile + open serial monitor
+make flash    # compile + flash via ST-Link
+```
+
+Requires the Arduino install at `/opt/arduino-nightly/` with the
+`stm32duino:STM32F1` package.
+
+---
+
+## Serial decoder (`SW/decoder.py`)
+
+Reads the firmware's serial output and prints human-readable labels.
+
+```bash
+# From USB serial port (default 115200 baud):
+python3 decoder.py /dev/ttyUSB0
+
+# Custom baud:
+python3 decoder.py /dev/ttyUSB0 9600
+
+# Pipe from file or socat:
+python3 decoder.py --stdin < log.txt
+
+# Append raw hex [XX XX ...] to every decoded line:
+python3 decoder.py --debug /dev/ttyUSB0
+python3 decoder.py --debug --stdin
+```
+
+Output prefixes:
+
+| Prefix | Colour | Meaning |
+|---|---|---|
+| `SPI` | Yellow | Front-panel → MCU SPI packet (decoded) |
+| `BTN` | Red | Button / knob event |
+| `I2C` | Green | MCU → TDA7342 I2C command (decoded) |
+
+---
+
+## Configuration (`feature/eeprom-gala`)
+
+### Stored values
+
+Configuration is saved in the **last 1 KB page of STM32 flash** (`0x8007C00`).
+Three values are persisted:
+
+| Field | Range | Default | Meaning |
+|---|---|---|---|
+| `vol` | 1–5 | 3 | Start volume level at power-on |
+| `gala` | 0–5 | 0 | GALA speed-volume aggressiveness (0 = off) |
+| `ta` | 1–5 | 3 | TA (traffic announcement) level |
+
+The page is protected by 3 magic bytes and a CRC (`vol+gala+ta`).
+After a CRC pass each field is range-checked; out-of-range fields fall
+back to their default individually (guards against partial flash corruption).
+
+### Start volume (`vol`)
+
+`vol` is a **fixed level index**, not a relative offset.  It maps to an
+absolute TDA7342 register value via a lookup table:
+
+| `vol` | I2C hex | Approx. level |
+|---|---|---|
+| 1 | `0x56` | quietest |
+| 2 | `0x52` | |
+| 3 | `0x4E` | default |
+| 4 | `0x4A` | |
+| 5 | `0x46` | loudest |
+
+Each step is 4 register counts ≈ **2 dB**.
+
+### GALA speed-volume (`gala`)
+
+When `gala > 0` the firmware reads a VSS (vehicle speed signal) pulse on
+**PA0**.  Speed is calculated from the pulse width:
+
+```
+speed_km/h = 1 000 000 / (2 × pulse_width_µs)
+```
+
+GALA level controls the base speed threshold at which volume starts rising:
+
+| `gala` | Base threshold |
+|---|---|
+| 1 | 100 km/h |
+| 2 | 85 km/h |
+| 3 | 70 km/h |
+| 4 | 55 km/h |
+| 5 | 40 km/h |
+
+Above the base threshold volume steps **up** by 1 and loudness steps **down**
+every additional 30 km/h band.  Slowing down reverses the corrections.
+Hardware note: the 1 kΩ `1k_GALA` resistor on the PCB **must be populated**
+when using GALA firmware.
+
+### Setting config via serial commands
+
+With `USE_SERIAL` enabled, send commands over UART1 (115200 baud):
+
+| Command | Effect |
+|---|---|
+| `s1` … `s5` | Set start volume level |
+| `g0` … `g5` | Set GALA level (0 = off) |
+| `w` | Save current config to flash |
+
+### Setting config via radio menu (display auto-save)
+
+The firmware sniffs `0x9A 0x58` display packets sent by the radio when the
+user navigates the **settings menu** (accessed with the TP button).
+Config is saved to flash automatically as the user scrolls:
+
+| Radio display | Saved value |
+|---|---|
+| `VOL  1` … `VOL  5` | `vol` = 1–5 |
+| `GALA 1` … `GALA 5` | `gala` = 1–5 |
+| `GALA OFF` | `gala` = 0 |
+| `TA   1` … `TA   5` | `ta` = 1–5 |
+
+### Debug serial output
+
+When `USE_SERIAL` is defined, key events print with these prefixes:
+
+| Prefix | When |
+|---|---|
+| `CFG_LOAD: vol=X gala=X ta=X` | Config read from flash at startup |
+| `CFG_PANEL: vol/gala/ta=X` | Value parsed from radio display packet |
+| `CFG_SAVE: OK/FAIL vol=X gala=X ta=X` | Flash write result |
+| `GALA_SPEED: prev->new km/h base_thr=X` | Speed change detected |
+| `GALA_VOL: UP/DOWN band=X thr=X vol=0xXX` | Volume step applied |
+| `GALA_LOUD: UP/DOWN band=X thr=X loud=0xXX` | Loudness step applied |

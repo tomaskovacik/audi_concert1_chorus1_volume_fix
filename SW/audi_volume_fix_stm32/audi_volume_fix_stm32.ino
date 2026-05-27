@@ -5,7 +5,7 @@
 mcuCLK    = PA5  (SPI1_SCK  - input, MCU drives CLK)
 mcuDATA   = PA7  (SPI1_MOSI - input, shared DATA via resistors)
 mcuSTATUS = PA15 (input, panel drives STATUS)
-GALA      = PA0  (input, speed pulse from vehicle — optional feature)
+GALA      = PB5  (input, TIM3_CH2, speed pulse from HC05 pin23 via 1kΩ — optional feature)
 */
 #include <SPI.h>
 #include <Wire_slave.h>
@@ -41,8 +41,8 @@ struct Config {
 #define DEFAULT_GALA  0   // GALA off by default
 #define DEFAULT_TA    3
 
-// GALA speed input pin (PA0 = free pin on HWv5)
-#define GALA_PIN  PA0
+// GALA speed input pin (PB5 = TIM3_CH2, tied with PB4/TIM3_CH1 — parallel with HC05 pin23, BC558 PNP high-side driver via 1kΩ)
+#define GALA_PIN  PB5
 /*
     SPI communication between motorola MC68HC05B32 cpu to front panel ST6280
     basics:
@@ -150,6 +150,11 @@ volatile bool in_volume_recalc = false;
 // GALA state
 volatile uint16_t gala_captime = 0;  // pulse width in µs (filled by ISR)
 uint16_t gala_prev_speed = 0;
+// Rolling average over last 8 pulses to suppress ±1 µs jitter
+#define GALA_AVG_N 8
+static uint16_t gala_pulse_buf[GALA_AVG_N];
+static uint8_t  gala_pulse_idx = 0;
+static bool     gala_buf_full  = false;
 
 bool displayRESETstate = false;
 
@@ -217,7 +222,7 @@ static bool writeConfig(Config c) {
 
 static uint8_t volLevelToHex(uint8_t level) {
   // levels 1-5 → volume hex (higher = quieter on TDA7342)
-  static const uint8_t tbl[] = { 0x56, 0x52, 0x4E, 0x4A, 0x46 };
+  static const uint8_t tbl[] = { 0xC2, 0xBE, 0xBA, 0xB6, 0xB2 };
   if (level < 1) level = 1;
   if (level > 5) level = 5;
   return tbl[level - 1];
@@ -262,9 +267,10 @@ void setup ()
   // RCC APB2ENR (0x40021018): bit 0 = AFIOEN, bit 12 = SPI1EN
   volatile uint32_t *rcc_apb2enr = (volatile uint32_t*)0x40021018;
   *rcc_apb2enr |= (1u << 0) | (1u << 12);
-  // Clear AFIO SPI1_REMAP (bit 0 of AFIO_MAPR) → default pins PA4-PA7
+  // AFIO_MAPR: disable JTAG, keep SWD (SWJ_CFG=010) → frees PB3/PB4 for GPIO
+  // Clear SPI1_REMAP (bit 0) → default pins PA4-PA7
   volatile uint32_t *afio_mapr = (volatile uint32_t*)0x40010004;
-  *afio_mapr &= ~(1u << 0);
+  *afio_mapr = (*afio_mapr & ~((7u << 24) | (1u << 0))) | (2u << 24);
 
   // PA4/NSS, PA5/SCK, PA7/MOSI must be INPUT before enabling SPI1
   gpio_set_mode(GPIOA, 4, GPIO_INPUT_FLOATING);  // NSS driven via PA3→inverter
@@ -282,7 +288,7 @@ void setup ()
 
   // GALA: Timer2 at 1µs resolution for speed pulse measurement
   if (cfg.gala > 0) {
-    pinMode(GALA_PIN, INPUT_PULLUP);
+    pinMode(GALA_PIN, INPUT_PULLDOWN);
     Timer2.setPrescaleFactor(72);  // 72MHz / 72 = 1MHz = 1µs ticks
     Timer2.setOverflow(0xFFFF);
     Timer2.pause();
@@ -312,6 +318,8 @@ void printInfo() {
     USEDSERIAL.print(F("CFG_LOAD: GALA base_thr="));
     USEDSERIAL.print(100 - (cfg.gala - 1) * 15);
     USEDSERIAL.println(F(" km/h"));
+  } else {
+    USEDSERIAL.println(F("CFG_LOAD: GALA disabled (send g1..g5 to enable)"));
   }
 }
 
@@ -386,11 +394,12 @@ void loop()
       uint8_t _data[howmanybytesinpacket];
       i2c_data.read(_data);
 #ifdef USE_SERIAL
-      USEDSERIAL.print(F("I2C"));
-      for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
-        USEDSERIAL.print(' '); USEDSERIAL.print(_data[i], HEX);
-      }
-      USEDSERIAL.println();
+      // incoming I2C from radio (HC05 → TDA7342) — disabled, use TDA for outgoing
+      // USEDSERIAL.print(F("I2C"));
+      // for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
+      //   USEDSERIAL.print(' '); USEDSERIAL.print(_data[i], HEX);
+      // }
+      // USEDSERIAL.println();
 #endif
       if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {
         // volume/loudness packet from panel — ignore, we control volume ourselves
@@ -421,7 +430,17 @@ void loop()
   if (cfg.gala > 0 && gala_captime > 0) {
     uint16_t pulse_width_us = gala_captime;
     gala_captime = 0;
-    uint16_t speed_kmh = (uint16_t)(1000000UL / (2UL * pulse_width_us));
+
+    // Rolling average of last GALA_AVG_N pulse widths to suppress µs jitter
+    gala_pulse_buf[gala_pulse_idx] = pulse_width_us;
+    gala_pulse_idx = (gala_pulse_idx + 1) % GALA_AVG_N;
+    if (gala_pulse_idx == 0) gala_buf_full = true;
+    uint8_t n = gala_buf_full ? GALA_AVG_N : gala_pulse_idx;
+    uint32_t sum = 0;
+    for (uint8_t i = 0; i < n; i++) sum += gala_pulse_buf[i];
+    uint16_t avg_pulse_us = (uint16_t)(sum / n);
+
+    uint16_t speed_kmh = (uint16_t)(1000000UL / (2UL * avg_pulse_us));
 
     if (gala_prev_speed != speed_kmh) {
       // Speed threshold base and 30 km/h steps: vol up / loudness down as speed rises
@@ -429,7 +448,8 @@ void loop()
 #ifdef USE_SERIAL
       USEDSERIAL.print(F("GALA_SPEED: ")); USEDSERIAL.print(gala_prev_speed);
       USEDSERIAL.print(F("->")); USEDSERIAL.print(speed_kmh);
-      USEDSERIAL.print(F(" km/h base_thr=")); USEDSERIAL.println(base_speed_thr);
+      USEDSERIAL.print(F(" km/h pulse_us=")); USEDSERIAL.print(avg_pulse_us);
+      USEDSERIAL.print(F(" base_thr=")); USEDSERIAL.println(base_speed_thr);
 #endif
 
       // Going faster — step volume up and loudness down at each 30 km/h band
@@ -687,6 +707,13 @@ void receiveEvent (int howMany)
 }
 
 void sendI2C (const uint8_t data[howmanybytesinpacket]) {
+#ifdef USE_SERIAL
+  USEDSERIAL.print(F("TDA"));
+  for (uint8_t i = 1; i <= data[0]; i++) {
+    USEDSERIAL.print(' '); USEDSERIAL.print(data[i], HEX);
+  }
+  USEDSERIAL.println();
+#endif
   SWire.beginTransmission(MY_ADDRESS);
 
   for (byte i = 0 ; i < data[0]; i++) {

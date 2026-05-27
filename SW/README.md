@@ -91,12 +91,27 @@ Each step is 4 register counts ≈ **2 dB**.
 
 ### GALA speed-volume (`gala`)
 
-When `gala > 0` the firmware reads a VSS (vehicle speed signal) pulse on
-**PA0**.  Speed is calculated from the pulse width:
+GALA (*Geschwindigkeitsabhängige Lautstärkeautomatik* — speed-dependent automatic
+volume) automatically raises the volume as speed increases to compensate for rising
+road and wind noise, keeping perceived audio level consistent.
+
+| Level | Sensitivity | Description |
+|---|---|---|
+| `0` | Off | Volume stays exactly where you set it — GALA disabled |
+| `1` | Lowest | Subtle boost; only noticeable at high highway speeds |
+| `2` | Low | Mild adjustment for relaxed highway driving |
+| `3` | Medium | Factory sweet spot for a stock Audi cabin; smooth steps with normal acceleration |
+| `4` | High | More aggressive; volume rises at lower speed thresholds |
+| `5` | Highest | Aggressively boosts volume starting at low speeds |
+
+When `gala > 0` the firmware measures a VSS (vehicle speed signal) pulse width on
+**PB5** (TIM3_CH2, tied with PB4/TIM3_CH1). Speed is derived from the pulse half-period:
 
 ```
-speed_km/h = 1 000 000 / (2 × pulse_width_µs)
+speed_km/h = 1 000 000 / (2 × avg_pulse_width_µs)
 ```
+
+An 8-sample rolling average suppresses µs-level jitter.
 
 GALA level controls the base speed threshold at which volume starts rising:
 
@@ -110,8 +125,10 @@ GALA level controls the base speed threshold at which volume starts rising:
 
 Above the base threshold volume steps **up** by 1 and loudness steps **down**
 every additional 30 km/h band.  Slowing down reverses the corrections.
-Hardware note: the 1 kΩ `1k_GALA` resistor on the PCB **must be populated**
-when using GALA firmware.
+
+Hardware: BC558 PNP high-side driver on the radio PCB drives the GALA line.
+STM32 PB5 is connected in parallel with HC05 pin 23 via a 1 kΩ series resistor.
+`INPUT_PULLDOWN` is used so the pin reads LOW cleanly when the transistor is OFF.
 
 ### Setting config via serial commands
 

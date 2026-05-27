@@ -20,6 +20,7 @@ G  = "\033[92m"   # green  – volume / loudness
 Y  = "\033[93m"   # yellow – display text / LEDs
 B  = "\033[94m"   # blue   – I2C
 C  = "\033[96m"   # cyan   – SPI raw
+M  = "\033[95m"   # magenta – GALA speed
 RST = "\033[0m"
 
 # ── Panel button map (from audi_concert_panel.h) ─────────────────────────────
@@ -275,6 +276,65 @@ def handle_line(raw, debug=False):
                 print(f"{G}I2C  {line}{suffix}{RST}")
         else:
             print(f"{B}I2C  [{hex_str}]{RST}")
+
+    elif raw.startswith("TDA "):
+        try:
+            d = [int(x, 16) for x in raw[4:].split()]
+        except ValueError:
+            print(f"{B}TDA  {raw[4:]}{RST}")
+            return
+        hex_str = ' '.join(f'{b:02X}' for b in d)
+        # prepend length byte so decode_i2c() gets same format as I2C packets
+        decoded = decode_i2c([len(d)] + d) if d else []
+        if decoded:
+            for line in decoded:
+                suffix = f"  [{hex_str}]" if debug else ""
+                print(f"{G}TDA  {line}{suffix}{RST}")
+        else:
+            print(f"{B}TDA  [{hex_str}]{RST}")
+
+    elif raw.startswith("GALA_SPEED:"):
+        # Format: "GALA_SPEED: prev->new km/h pulse_us=N base_thr=T"
+        m = re.match(
+            r"GALA_SPEED:\s+(\d+)->(\d+)\s+km/h(?:\s+pulse_us=(\d+))?(?:\s+base_thr=(\d+))?",
+            raw)
+        if m:
+            prev, new = int(m.group(1)), int(m.group(2))
+            arrow = "↑" if new > prev else ("↓" if new < prev else "=")
+            parts = [f"GALA  {prev} {arrow} {new} km/h"]
+            if m.group(3):
+                pulse_us = int(m.group(3))
+                freq_hz  = 1_000_000 / (2 * pulse_us) if pulse_us else 0
+                parts.append(f"freq={freq_hz:.1f} Hz  pulse={pulse_us} µs")
+            if m.group(4):
+                parts.append(f"base_thr={m.group(4)} km/h")
+            suffix = f"  [{raw}]" if debug else ""
+            print(f"{M}{'  '.join(parts)}{suffix}{RST}")
+        else:
+            print(f"{M}  {raw}{RST}")
+
+    elif raw.startswith("GALA_VOL:"):
+        m = re.match(r"GALA_VOL:\s+(UP|DOWN)\s+band=(\d+)\s+thr=(\d+)\s+vol=(\S+)", raw)
+        if m:
+            direction, band, thr, vol = m.group(1), m.group(2), m.group(3), m.group(4)
+            arrow = "↑" if direction == "UP" else "↓"
+            suffix = f"  [{raw}]" if debug else ""
+            print(f"{G}GALA  Vol {arrow}  band={band} thr={thr} km/h  vol={vol}{suffix}{RST}")
+        else:
+            print(f"{G}  {raw}{RST}")
+
+    elif raw.startswith("GALA_LOUD:"):
+        m = re.match(r"GALA_LOUD:\s+(UP|DOWN)\s+band=(\d+)\s+thr=(\d+)\s+loud=(\S+)", raw)
+        if m:
+            direction, band, thr, loud = m.group(1), m.group(2), m.group(3), m.group(4)
+            arrow = "↑" if direction == "UP" else "↓"
+            suffix = f"  [{raw}]" if debug else ""
+            print(f"{G}GALA  Loud {arrow}  band={band} thr={thr} km/h  loud={loud}{suffix}{RST}")
+        else:
+            print(f"{G}  {raw}{RST}")
+
+    elif raw.startswith("GALA_"):
+        print(f"{M}  {raw}{RST}")
 
     elif raw.startswith("Firmware"):
         print(f"  {raw}")

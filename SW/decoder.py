@@ -96,11 +96,21 @@ def decode_spi(d):
         text = ''.join(chr(b) if 0x20 <= b < 0x7F else '.' for b in d[2:10])
         lines.append(f"Settings: \"{text.rstrip()}\"")
 
-    elif sub == 0x61:  # TAPE mode
-        tape = {0: "Eject", 1: "Play ▲", 2: "Play ▼",
-                3: "FF →→", 4: "RW ←←", 0x10: "TP-INFO",
-                0x0B: "SAFE", 0x14: "DIAG", 0x1A: "BOSE"}
-        lines.append(f"TAPE: {tape.get(d[2], f'0x{d[2]:02X}')}")
+    elif sub == 0x61:  # status/mode display (tape, AS-store, SAFE, DIAG, BOSE…)
+        status = {
+            0x00: "Tape: Eject",
+            0x01: "Tape: Play ▲",
+            0x02: "Tape: Play ▼",
+            0x03: "Tape: FF →→",
+            0x04: "Tape: RW ←←",
+            0x0B: "SAFE",
+            0x10: "TP-INFO",
+            0x13: "AS-STORE",
+            0x14: "DIAG",
+            0x17: "Unknown-0x17",
+            0x1A: "BOSE",
+        }
+        lines.append(f"Status: {status.get(d[2], f'0x{d[2]:02X}')}")
 
     elif sub == 0x71:  # BAS/TRE/BAL/FAD stored value
         hi = d[2] >> 4

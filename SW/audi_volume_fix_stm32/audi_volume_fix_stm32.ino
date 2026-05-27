@@ -173,9 +173,14 @@ static Config readConfig() {
   const Config *p = (const Config *)CFG_FLASH_PAGE;
   Config c = *p;
   if (c.magic[0] == CFG_MAGIC0 && c.magic[1] == CFG_MAGIC1 && c.magic[2] == CFG_MAGIC2
-      && c.crc == (uint8_t)(c.vol + c.gala + c.ta))
+      && c.crc == (uint8_t)(c.vol + c.gala + c.ta)) {
+    // CRC ok — clamp each field to valid range (guard against partial flash corruption)
+    if (c.vol  < 1 || c.vol  > 5) c.vol  = DEFAULT_VOL;
+    if (c.gala > 5)                c.gala = DEFAULT_GALA;
+    if (c.ta   < 1 || c.ta   > 5) c.ta   = DEFAULT_TA;
     return c;
-  // defaults
+  }
+  // magic/CRC mismatch — full defaults
   c.magic[0] = CFG_MAGIC0; c.magic[1] = CFG_MAGIC1; c.magic[2] = CFG_MAGIC2;
   c.vol  = DEFAULT_VOL;
   c.gala = DEFAULT_GALA;

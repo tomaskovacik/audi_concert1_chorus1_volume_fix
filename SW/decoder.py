@@ -7,6 +7,8 @@ Usage:
   python3 decoder.py /dev/ttyUSB0          # default 115200
   python3 decoder.py /dev/ttyUSB0 9600
   python3 decoder.py --stdin               # pipe from file / socat
+  python3 decoder.py --debug /dev/ttyUSB0  # append raw hex to every line
+  python3 decoder.py --debug --stdin       # debug from stdin
 """
 
 import sys
@@ -222,7 +224,7 @@ def decode_i2c(d):
 
 
 # ── Main line dispatcher ──────────────────────────────────────────────────────
-def handle_line(raw):
+def handle_line(raw, debug=False):
     raw = raw.strip()
     if not raw:
         return
@@ -237,11 +239,11 @@ def handle_line(raw):
         decoded = decode_spi(d) if d else []
         if decoded:
             for line in decoded:
-                # 0x13 LEDs already embed raw; others get it appended here
-                suffix = f"  [{hex_str}]" if "[" not in line else ""
-                print(f"{Y}SPI  {line}{suffix}{RST}")
+                # strip inline [raw] that 0x13 LEDs embed; re-append only in debug mode
+                clean = line[:line.rfind("  [")] if "  [" in line else line
+                suffix = f"  [{hex_str}]" if debug else ""
+                print(f"{Y}SPI  {clean}{suffix}{RST}")
         else:
-            hex_str = ' '.join(f'{b:02X}' for b in d)
             print(f"{C}SPI  [{hex_str}]{RST}")
 
     elif raw.startswith("BTN "):
@@ -251,8 +253,9 @@ def handle_line(raw):
             print(f"{R}BTN  {raw[4:]}{RST}")
             return
         name = BUTTONS.get(code)
+        suffix = f"  [0x{code:02X}]" if debug else ""
         if name:
-            print(f"{R}BTN  {name}{RST}")
+            print(f"{R}BTN  {name}{suffix}{RST}")
         else:
             print(f"{R}BTN  0x{code:02X}{RST}")
 
@@ -262,12 +265,13 @@ def handle_line(raw):
         except ValueError:
             print(f"{B}I2C  {raw[4:]}{RST}")
             return
+        hex_str = ' '.join(f'{b:02X}' for b in d)
         decoded = decode_i2c(d) if len(d) >= 3 else []
         if decoded:
             for line in decoded:
-                print(f"{G}I2C  {line}{RST}")
+                suffix = f"  [{hex_str}]" if debug else ""
+                print(f"{G}I2C  {line}{suffix}{RST}")
         else:
-            hex_str = ' '.join(f'{b:02X}' for b in d)
             print(f"{B}I2C  [{hex_str}]{RST}")
 
     elif raw.startswith("Firmware"):
@@ -279,10 +283,15 @@ def handle_line(raw):
 def main():
     args = sys.argv[1:]
 
+    debug = "--debug" in args
+    args = [a for a in args if a != "--debug"]
+
     if not args or args[0] == "--stdin":
+        if debug:
+            print("Debug mode ON — raw hex appended to every line.")
         print("Reading from stdin…")
         for line in sys.stdin:
-            handle_line(line)
+            handle_line(line, debug)
         return
 
     port = args[0]
@@ -294,7 +303,7 @@ def main():
         print("pip install pyserial")
         sys.exit(1)
 
-    print(f"Opening {port} @ {baud}…")
+    print(f"Opening {port} @ {baud}…" + (" [debug]" if debug else ""))
     with serial.Serial(port, baud, timeout=1) as ser:
         ser.reset_input_buffer()   # discard any partial line sitting in the buffer
         ser.readline()             # throw away the first (potentially incomplete) line
@@ -302,7 +311,7 @@ def main():
         while True:
             try:
                 line = ser.readline().decode("ascii", errors="replace")
-                handle_line(line)
+                handle_line(line, debug)
             except KeyboardInterrupt:
                 print("\nBye.")
                 break

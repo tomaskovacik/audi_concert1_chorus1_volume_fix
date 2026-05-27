@@ -192,8 +192,21 @@ static bool writeConfig(Config c) {
   const uint16_t *src_words = (const uint16_t *)&c;
   uint32_t flash_addr = CFG_FLASH_PAGE;
   for (uint8_t i = 0; i < (sizeof(Config) + 1) / 2; i++, flash_addr += 2)
-    if (FLASH_ProgramHalfWord(flash_addr, src_words[i]) != FLASH_COMPLETE) { FLASH_Lock(); return false; }
+    if (FLASH_ProgramHalfWord(flash_addr, src_words[i]) != FLASH_COMPLETE) {
+      FLASH_Lock();
+#ifdef USE_SERIAL
+      USEDSERIAL.print(F("CFG_SAVE: FAIL vol=")); USEDSERIAL.print(c.vol);
+      USEDSERIAL.print(F(" gala="));              USEDSERIAL.print(c.gala);
+      USEDSERIAL.print(F(" ta="));                USEDSERIAL.println(c.ta);
+#endif
+      return false;
+    }
   FLASH_Lock();
+#ifdef USE_SERIAL
+  USEDSERIAL.print(F("CFG_SAVE: OK vol=")); USEDSERIAL.print(c.vol);
+  USEDSERIAL.print(F(" gala="));            USEDSERIAL.print(c.gala);
+  USEDSERIAL.print(F(" ta="));              USEDSERIAL.println(c.ta);
+#endif
   return true;
 }
 
@@ -286,12 +299,14 @@ void printInfo() {
   USEDSERIAL.println(F("(C) kovo, GPL3"));
   USEDSERIAL.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
   USEDSERIAL.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
-  USEDSERIAL.print(F("Start volume level (s1-s5): ")); USEDSERIAL.println(cfg.vol);
-  USEDSERIAL.print(F("GALA level (g0-g5, 0=off):  ")); USEDSERIAL.println(cfg.gala);
+  // CFG_LOAD: config loaded from flash at startup
+  USEDSERIAL.print(F("CFG_LOAD: vol=")); USEDSERIAL.print(cfg.vol);
+  USEDSERIAL.print(F(" gala="));        USEDSERIAL.print(cfg.gala);
+  USEDSERIAL.print(F(" ta="));          USEDSERIAL.println(cfg.ta);
   if (cfg.gala > 0) {
-    USEDSERIAL.print(F("  GALA speed threshold: "));
+    USEDSERIAL.print(F("CFG_LOAD: GALA base_thr="));
     USEDSERIAL.print(100 - (cfg.gala - 1) * 15);
-    USEDSERIAL.println(F(" km/h base"));
+    USEDSERIAL.println(F(" km/h"));
   }
 }
 
@@ -406,6 +421,11 @@ void loop()
     if (gala_prev_speed != speed_kmh) {
       // Speed threshold base and 30 km/h steps: vol up / loudness down as speed rises
       uint16_t base_speed_thr = (uint16_t)(100 - (cfg.gala - 1) * 15);
+#ifdef USE_SERIAL
+      USEDSERIAL.print(F("GALA_SPEED: ")); USEDSERIAL.print(gala_prev_speed);
+      USEDSERIAL.print(F("->")); USEDSERIAL.print(speed_kmh);
+      USEDSERIAL.print(F(" km/h base_thr=")); USEDSERIAL.println(base_speed_thr);
+#endif
 
       // Going faster — step volume up and loudness down at each 30 km/h band
       for (uint8_t band = 0; band < 5; band++) {
@@ -413,16 +433,36 @@ void loop()
         uint16_t loud_speed_thr = vol_speed_thr + 15;
         if (gala_prev_speed <= vol_speed_thr && vol_speed_thr < speed_kmh) {
           set_volume_up(); set_volume();
+#ifdef USE_SERIAL
+          USEDSERIAL.print(F("GALA_VOL: UP band=")); USEDSERIAL.print(band);
+          USEDSERIAL.print(F(" thr=")); USEDSERIAL.print(vol_speed_thr);
+          USEDSERIAL.print(F(" vol=0x")); USEDSERIAL.println(volume, HEX);
+#endif
         }
         if (gala_prev_speed <= loud_speed_thr && loud_speed_thr < speed_kmh && loudness > 0x06) {
           loudness--; current_loudness = loudness + 1; set_loudness();
+#ifdef USE_SERIAL
+          USEDSERIAL.print(F("GALA_LOUD: DOWN band=")); USEDSERIAL.print(band);
+          USEDSERIAL.print(F(" thr=")); USEDSERIAL.print(loud_speed_thr);
+          USEDSERIAL.print(F(" loud=0x")); USEDSERIAL.println(loudness, HEX);
+#endif
         }
         // Slowing down — step volume down and loudness up
         if (speed_kmh < vol_speed_thr && vol_speed_thr <= gala_prev_speed) {
           set_volume_down(); set_volume();
+#ifdef USE_SERIAL
+          USEDSERIAL.print(F("GALA_VOL: DOWN band=")); USEDSERIAL.print(band);
+          USEDSERIAL.print(F(" thr=")); USEDSERIAL.print(vol_speed_thr);
+          USEDSERIAL.print(F(" vol=0x")); USEDSERIAL.println(volume, HEX);
+#endif
         }
         if (speed_kmh < loud_speed_thr && loud_speed_thr <= gala_prev_speed && loudness < 0x0E) {
           loudness++; current_loudness = loudness - 1; set_loudness();
+#ifdef USE_SERIAL
+          USEDSERIAL.print(F("GALA_LOUD: UP band=")); USEDSERIAL.print(band);
+          USEDSERIAL.print(F(" thr=")); USEDSERIAL.print(loud_speed_thr);
+          USEDSERIAL.print(F(" loud=0x")); USEDSERIAL.println(loudness, HEX);
+#endif
         }
       }
     }
@@ -549,6 +589,9 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       uint8_t level = _data[7] - '0';
       if (level >= 1 && level <= 5) {
         cfg.vol = level;
+#ifdef USE_SERIAL
+        USEDSERIAL.print(F("CFG_PANEL: vol=")); USEDSERIAL.println(cfg.vol);
+#endif
         writeConfig(cfg);
       }
     }
@@ -558,6 +601,9 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
       uint8_t level = _data[7] - '0';
       if (level >= 1 && level <= 5) {
         cfg.ta = level;
+#ifdef USE_SERIAL
+        USEDSERIAL.print(F("CFG_PANEL: ta=")); USEDSERIAL.println(cfg.ta);
+#endif
         writeConfig(cfg);
       }
     }
@@ -565,11 +611,17 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
     if (_data[2]=='G' && _data[3]=='A' && _data[4]=='L' && _data[5]=='A' && _data[6]==' ') {
       if (_data[7]=='O' && _data[8]=='F' && _data[9]=='F') {
         cfg.gala = 0;
+#ifdef USE_SERIAL
+        USEDSERIAL.println(F("CFG_PANEL: gala=0 (OFF)"));
+#endif
         writeConfig(cfg);
       } else if (_data[8]==' ' && _data[9]==' ') {
         uint8_t level = _data[7] - '0';
         if (level >= 1 && level <= 5) {
           cfg.gala = level;
+#ifdef USE_SERIAL
+          USEDSERIAL.print(F("CFG_PANEL: gala=")); USEDSERIAL.println(cfg.gala);
+#endif
           writeConfig(cfg);
         }
       }

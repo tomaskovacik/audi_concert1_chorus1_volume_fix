@@ -8,12 +8,10 @@ mcuSTATUS = PA15 (input, panel drives STATUS)
 GALA      = PB5  (input, TIM3_CH2, speed pulse from HC05 pin23 via 1kΩ — optional feature)
 */
 #include <SPI.h>
-#include <Wire_slave.h>
-
-#include <FlexWire.h>
+#include <Wire.h>
 #include "audi_concert_panel.h"
 
-FlexWire SWire = FlexWire(PB11, PB10);
+TwoWire SWire(PB11, PB10);  // I2C2: SDA=PB11, SCL=PB10
 
 #define USE_SERIAL
 #define USEDSERIAL Serial1
@@ -26,8 +24,6 @@ FlexWire SWire = FlexWire(PB11, PB10);
 #define CFG_MAGIC1  0x5Au
 #define CFG_MAGIC2  0xC3u
 
-// Raw flash write/erase API (part of the EEPROM library in Roger Clark core)
-#include "flash_stm32.h"
 
 struct Config {
   uint8_t magic[3];  // CFG_MAGIC0/1/2
@@ -197,13 +193,18 @@ static Config readConfig() {
 static bool writeConfig(Config c) {
   c.magic[0] = CFG_MAGIC0; c.magic[1] = CFG_MAGIC1; c.magic[2] = CFG_MAGIC2;
   c.crc = c.vol + c.gala + c.ta;
-  FLASH_Unlock();
-  FLASH_ErasePage(CFG_FLASH_PAGE);
+  HAL_FLASH_Unlock();
+  FLASH_EraseInitTypeDef eraseInit;
+  eraseInit.TypeErase   = FLASH_TYPEERASE_PAGES;
+  eraseInit.PageAddress = CFG_FLASH_PAGE;
+  eraseInit.NbPages     = 1;
+  uint32_t pageError    = 0;
+  HAL_FLASHEx_Erase(&eraseInit, &pageError);
   const uint16_t *src_words = (const uint16_t *)&c;
   uint32_t flash_addr = CFG_FLASH_PAGE;
   for (uint8_t i = 0; i < (sizeof(Config) + 1) / 2; i++, flash_addr += 2)
-    if (FLASH_ProgramHalfWord(flash_addr, src_words[i]) != FLASH_COMPLETE) {
-      FLASH_Lock();
+    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, flash_addr, (uint64_t)src_words[i]) != HAL_OK) {
+      HAL_FLASH_Lock();
 #ifdef USE_SERIAL
       USEDSERIAL.print(F("CFG_SAVE: FAIL vol=")); USEDSERIAL.print(c.vol);
       USEDSERIAL.print(F(" gala="));              USEDSERIAL.print(c.gala);
@@ -211,7 +212,7 @@ static bool writeConfig(Config c) {
 #endif
       return false;
     }
-  FLASH_Lock();
+  HAL_FLASH_Lock();
 #ifdef USE_SERIAL
   USEDSERIAL.print(F("CFG_SAVE: OK vol=")); USEDSERIAL.print(c.vol);
   USEDSERIAL.print(F(" gala="));            USEDSERIAL.print(c.gala);
@@ -231,14 +232,14 @@ static uint8_t volLevelToHex(uint8_t level) {
 // ── GALA ISRs ─────────────────────────────────────────────────────────────
 
 void galaRising() {
-  Timer2.setCount(0);
-  Timer2.resume();
+  TIM2->CNT = 0;
+  TIM2->CR1 |= TIM_CR1_CEN;
   attachInterrupt(digitalPinToInterrupt(GALA_PIN), galaFalling, FALLING);
 }
 
 void galaFalling() {
-  Timer2.pause();
-  gala_captime = Timer2.getCount();
+  TIM2->CR1 &= ~TIM_CR1_CEN;
+  gala_captime = (uint16_t)TIM2->CNT;
   attachInterrupt(digitalPinToInterrupt(GALA_PIN), galaRising, RISING);
 }
 
@@ -263,36 +264,34 @@ void setup ()
   digitalWrite(mcuCS, !digitalRead(mcuSTATUS));
   attachInterrupt(digitalPinToInterrupt(mcuSTATUS), mcuStatusChange, CHANGE);
 
-  // Enable SPI1 and AFIO clocks directly (SPI.begin() may target SPI2 on some cores).
-  // RCC APB2ENR (0x40021018): bit 0 = AFIOEN, bit 12 = SPI1EN
-  volatile uint32_t *rcc_apb2enr = (volatile uint32_t*)0x40021018;
-  *rcc_apb2enr |= (1u << 0) | (1u << 12);
-  // AFIO_MAPR: disable JTAG, keep SWD (SWJ_CFG=010) → frees PB3/PB4 for GPIO
-  // Clear SPI1_REMAP (bit 0) → default pins PA4-PA7
-  volatile uint32_t *afio_mapr = (volatile uint32_t*)0x40010004;
-  *afio_mapr = (*afio_mapr & ~((7u << 24) | (1u << 0))) | (2u << 24);
+  // Enable SPI1 and AFIO clocks
+  RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_SPI1EN;
+  // Disable JTAG, keep SWD (SWJ_CFG=010) → frees PB3/PB4 for GPIO; clear SPI1_REMAP → default pins PA4-PA7
+  AFIO->MAPR = (AFIO->MAPR & ~(AFIO_MAPR_SWJ_CFG | AFIO_MAPR_SPI1_REMAP)) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
 
   // PA4/NSS, PA5/SCK, PA7/MOSI must be INPUT before enabling SPI1
-  gpio_set_mode(GPIOA, 4, GPIO_INPUT_FLOATING);  // NSS driven via PA3→inverter
-  gpio_set_mode(GPIOA, 5, GPIO_INPUT_FLOATING);
-  gpio_set_mode(GPIOA, 7, GPIO_INPUT_FLOATING);
+  pinMode(PA4, INPUT);  // NSS driven via PA3→inverter
+  pinMode(PA5, INPUT);
+  pinMode(PA7, INPUT);
 
   // SPI1 slave: SSM=0 → hardware NSS (PA4).  NSS LOW = selected = shift reg active.
   // PA3 HIGH → inverter → PA4 LOW → NSS LOW → SPI1 counts 8 CLK edges → RXNE.
   // PA3 LOW  → inverter → PA4 HIGH → NSS HIGH → shift reg resets → byte framed.
-  SPI1->regs->CR1 = 0;  // MSTR=0, SSM=0, CPOL=0, CPHA=0
-  SPI1->regs->CR1 |= SPI_CR1_SPE;
-  SPI1->regs->CR2 = 0;  // no interrupts; loop() polls SR
+  SPI1->CR1 = 0;  // MSTR=0, SSM=0, CPOL=0, CPHA=0
+  SPI1->CR1 |= SPI_CR1_SPE;
+  SPI1->CR2 = 0;  // no interrupts; loop() polls SR
 
   pinMode(displayRESET, INPUT);
 
-  // GALA: Timer2 at 1µs resolution for speed pulse measurement
+  // GALA: TIM2 at 1µs resolution for speed pulse measurement
   if (cfg.gala > 0) {
     pinMode(GALA_PIN, INPUT_PULLDOWN);
-    Timer2.setPrescaleFactor(72);  // 72MHz / 72 = 1MHz = 1µs ticks
-    Timer2.setOverflow(0xFFFF);
-    Timer2.pause();
-    Timer2.setCount(0);
+    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+    TIM2->PSC = 71;       // 72MHz / (71+1) = 1MHz = 1µs ticks
+    TIM2->ARR = 0xFFFF;
+    TIM2->CNT = 0;
+    TIM2->CR1 = 0;        // stopped
+    TIM2->EGR = TIM_EGR_UG;  // force update to load PSC/ARR
     attachInterrupt(digitalPinToInterrupt(GALA_PIN), galaRising, RISING);
   }
 
@@ -673,8 +672,8 @@ void mcuStatusChange()
         digitalWrite(mcuCS, LOW);   // PA3 LOW → inverter → NSS HIGH
 
         // Harvest the completed byte immediately — before loop() gets a chance to run
-        if (SPI1->regs->SR & SPI_SR_RXNE) {
-            uint8_t b = (uint8_t)SPI1->regs->DR;
+        if (SPI1->SR & SPI_SR_RXNE) {
+            uint8_t b = (uint8_t)SPI1->DR;
             panel_message.write(b);
             if (panel_message.wbp == howmanybytesinpacket)
                 panel_message.wbp = 0; // overflow guard

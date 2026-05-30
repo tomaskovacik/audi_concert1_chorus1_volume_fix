@@ -6,7 +6,7 @@ BINARY     := $(BUILD_PATH)/audi_volume_fix_stm32.ino.bin
 FLASH_ADDR := 0x8000000
 
 BUILDER  := /opt/arduino-nightly/arduino-builder
-ST_FLASH := st-flash
+ST_FLASH := /home/nail/src/stlink/build/Release/bin/st-flash
 DECODER  := $(abspath ../decoder.py)
 
 STM32_CORE_PATH := /home/nail/.arduino15/packages/STMicroelectronics/hardware/stm32/2.4.0

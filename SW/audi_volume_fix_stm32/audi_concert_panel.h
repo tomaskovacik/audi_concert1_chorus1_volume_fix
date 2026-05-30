@@ -1,3 +1,14 @@
+#pragma once
+#include <stdint.h>
+
+struct Config {
+  uint8_t magic[3];
+  uint8_t vol;   // start volume level 1-5
+  uint8_t gala;  // GALA level: 0=off, 1-5
+  uint8_t ta;    // reserved
+  uint8_t crc;   // vol+gala+ta checksum
+};
+
 #define PANEL_1  0x01
 #define PANEL_2  0x02
 #define PANEL_3  0x03

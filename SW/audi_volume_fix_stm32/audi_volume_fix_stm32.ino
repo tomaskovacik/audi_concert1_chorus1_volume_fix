@@ -9,9 +9,10 @@ GALA      = PB5  (input, TIM3_CH2, speed pulse from HC05 pin23 via 1kΩ — opti
 */
 #include <SPI.h>
 #include <Wire.h>
+#include <FlexWire.h>
 #include "audi_concert_panel.h"
 
-TwoWire SWire(PB11, PB10);  // I2C2: SDA=PB11, SCL=PB10
+FlexWire SWire = FlexWire(PB11, PB10);
 
 #define USE_SERIAL
 #define USEDSERIAL Serial1
@@ -24,14 +25,6 @@ TwoWire SWire(PB11, PB10);  // I2C2: SDA=PB11, SCL=PB10
 #define CFG_MAGIC1  0x5Au
 #define CFG_MAGIC2  0xC3u
 
-
-struct Config {
-  uint8_t magic[3];  // CFG_MAGIC0/1/2
-  uint8_t vol;       // start volume level 1-5  (1=quietest, 5=loudest default=3)
-  uint8_t gala;      // GALA level: 0=off, 1-5 (5=most aggressive speed-volume)
-  uint8_t ta;        // reserved (traffic announcement volume bump, future use)
-  uint8_t crc;       // vol+gala+ta checksum
-};
 
 #define DEFAULT_VOL   3
 #define DEFAULT_GALA  0   // GALA off by default

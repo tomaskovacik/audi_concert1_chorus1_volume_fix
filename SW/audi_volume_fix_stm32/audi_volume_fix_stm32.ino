@@ -5,10 +5,10 @@
 mcuCLK    = PA5  (SPI1_SCK  - input, MCU drives CLK)
 mcuDATA   = PA7  (SPI1_MOSI - input, shared DATA via resistors)
 mcuSTATUS = PA15 (input, panel drives STATUS)
+GALA      = PB5  (input, TIM3_CH2, speed pulse from HC05 pin23 via 1kΩ — optional feature)
 */
 #include <SPI.h>
-#include <Wire_slave.h>
-
+#include <Wire.h>
 #include <FlexWire.h>
 #include "audi_concert_panel.h"
 
@@ -16,6 +16,22 @@ FlexWire SWire = FlexWire(PB11, PB10);
 
 #define USE_SERIAL
 #define USEDSERIAL Serial1
+
+// ── Config flash storage ───────────────────────────────────────────────────
+// STM32F103C6 = 32KB flash. Reserve the last 1KB page for config.
+// We only write on explicit serial command so no wear-levelling needed.
+#define CFG_FLASH_PAGE  ((uint32_t)(0x08000000u + 32u*1024u - 1u*1024u))  // 0x8007C00
+#define CFG_MAGIC0  0xA5u
+#define CFG_MAGIC1  0x5Au
+#define CFG_MAGIC2  0xC3u
+
+
+#define DEFAULT_VOL   3
+#define DEFAULT_GALA  0   // GALA off by default
+#define DEFAULT_TA    3
+
+// GALA speed input pin (PB5 = TIM3_CH2, tied with PB4/TIM3_CH1 — parallel with HC05 pin23, BC558 PNP high-side driver via 1kΩ)
+#define GALA_PIN  PB5
 /*
     SPI communication between motorola MC68HC05B32 cpu to front panel ST6280
     basics:
@@ -41,7 +57,7 @@ FlexWire SWire = FlexWire(PB11, PB10);
 #define mcuCS     PA3  // output: mirrors STATUS → HW inverter → SPI1_NSS (PA4)
 #define mcuSTATUS PA15
 #define displayRESET PB8
-#define VERSION "2.0-25.05.26-HWv5"
+#define VERSION "2.1-25.05.26-HWv5"
 
 //we are trying to interface with communication to TDA7342 which is 0x44 so...
 #define I2C_7BITADDR 0x44
@@ -107,21 +123,29 @@ volatile uint8_t _i2c_data_buf[howmanypackets * howmanybytesinpacket];  // I2C d
 CircularPacketBuffer panel_message = { _panel_msg_buf, 0, 0, 0, false }; // SPI front panel messages
 CircularPacketBuffer i2c_data      = { _i2c_data_buf,  0, 0, 0, false }; // I2C packets from MCU
 
-volatile uint8_t start_volume = 0xBA;
+Config cfg;  // loaded once in setup(), updated on serial command
 
-volatile uint8_t volume = start_volume;
-volatile uint8_t current_volume = start_volume;
-volatile uint8_t saved_volume = start_volume;
+volatile uint8_t volume         = 0xBA;
+volatile uint8_t current_volume = 0xBA;
+volatile uint8_t saved_volume   = 0xBA;
 
-volatile uint8_t start_loudness = 0x0E;
+volatile uint8_t loudness         = 0x0E;
+volatile uint8_t current_loudness = 0x0E;
 
-volatile uint8_t loudness = start_loudness;
-volatile uint8_t current_loudness = start_loudness;
-
-volatile uint8_t grab_volume = 1;
-
-volatile bool mute = false;
+volatile bool grab_volume    = true;
+volatile bool mute           = false;
 volatile bool in_volume_recalc = false;
+
+// GALA state
+volatile uint16_t gala_captime = 0;  // pulse width in µs (filled by ISR)
+uint16_t gala_prev_speed = 0;
+// Rolling average over last 8 pulses to suppress ±1 µs jitter
+#define GALA_AVG_N 8
+static uint16_t gala_pulse_buf[GALA_AVG_N];
+static uint8_t  gala_pulse_idx = 0;
+static bool     gala_buf_full  = false;
+
+bool displayRESETstate = false;
 
 uint8_t volume_packet[howmanybytesinpacket];
 uint8_t loudness_packet[howmanybytesinpacket];
@@ -137,8 +161,88 @@ void set_mute();
 void set_unmute();
 void receiveEvent(int howMany);
 
+// ── Config (raw flash, 1KB page) ──────────────────────────────────────────
+
+static Config readConfig() {
+  const Config *p = (const Config *)CFG_FLASH_PAGE;
+  Config c = *p;
+  if (c.magic[0] == CFG_MAGIC0 && c.magic[1] == CFG_MAGIC1 && c.magic[2] == CFG_MAGIC2
+      && c.crc == (uint8_t)(c.vol + c.gala + c.ta)) {
+    // CRC ok — clamp each field to valid range (guard against partial flash corruption)
+    if (c.vol  < 1 || c.vol  > 5) c.vol  = DEFAULT_VOL;
+    if (c.gala > 5)                c.gala = DEFAULT_GALA;
+    if (c.ta   < 1 || c.ta   > 5) c.ta   = DEFAULT_TA;
+    return c;
+  }
+  // magic/CRC mismatch — full defaults
+  c.magic[0] = CFG_MAGIC0; c.magic[1] = CFG_MAGIC1; c.magic[2] = CFG_MAGIC2;
+  c.vol  = DEFAULT_VOL;
+  c.gala = DEFAULT_GALA;
+  c.ta   = DEFAULT_TA;
+  c.crc  = c.vol + c.gala + c.ta;
+  return c;
+}
+
+static bool writeConfig(Config c) {
+  c.magic[0] = CFG_MAGIC0; c.magic[1] = CFG_MAGIC1; c.magic[2] = CFG_MAGIC2;
+  c.crc = c.vol + c.gala + c.ta;
+  HAL_FLASH_Unlock();
+  FLASH_EraseInitTypeDef eraseInit;
+  eraseInit.TypeErase   = FLASH_TYPEERASE_PAGES;
+  eraseInit.PageAddress = CFG_FLASH_PAGE;
+  eraseInit.NbPages     = 1;
+  uint32_t pageError    = 0;
+  HAL_FLASHEx_Erase(&eraseInit, &pageError);
+  const uint16_t *src_words = (const uint16_t *)&c;
+  uint32_t flash_addr = CFG_FLASH_PAGE;
+  for (uint8_t i = 0; i < (sizeof(Config) + 1) / 2; i++, flash_addr += 2)
+    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, flash_addr, (uint64_t)src_words[i]) != HAL_OK) {
+      HAL_FLASH_Lock();
+#ifdef USE_SERIAL
+      USEDSERIAL.print(F("CFG_SAVE: FAIL vol=")); USEDSERIAL.print(c.vol);
+      USEDSERIAL.print(F(" gala="));              USEDSERIAL.print(c.gala);
+      USEDSERIAL.print(F(" ta="));                USEDSERIAL.println(c.ta);
+#endif
+      return false;
+    }
+  HAL_FLASH_Lock();
+#ifdef USE_SERIAL
+  USEDSERIAL.print(F("CFG_SAVE: OK vol=")); USEDSERIAL.print(c.vol);
+  USEDSERIAL.print(F(" gala="));            USEDSERIAL.print(c.gala);
+  USEDSERIAL.print(F(" ta="));              USEDSERIAL.println(c.ta);
+#endif
+  return true;
+}
+
+static uint8_t volLevelToHex(uint8_t level) {
+  // levels 1-5 → volume hex (higher = quieter on TDA7342)
+  static const uint8_t tbl[] = { 0xC2, 0xBE, 0xBA, 0xB6, 0xB2 };
+  if (level < 1) level = 1;
+  if (level > 5) level = 5;
+  return tbl[level - 1];
+}
+
+// ── GALA ISRs ─────────────────────────────────────────────────────────────
+
+void galaRising() {
+  TIM2->CNT = 0;
+  TIM2->CR1 |= TIM_CR1_CEN;
+  attachInterrupt(digitalPinToInterrupt(GALA_PIN), galaFalling, FALLING);
+}
+
+void galaFalling() {
+  TIM2->CR1 &= ~TIM_CR1_CEN;
+  gala_captime = (uint16_t)TIM2->CNT;
+  attachInterrupt(digitalPinToInterrupt(GALA_PIN), galaRising, RISING);
+}
+
 void setup ()
 {
+  // Load config from flash and apply start volume
+  cfg = readConfig();
+  uint8_t start_vol = volLevelToHex(cfg.vol);
+  volume = current_volume = saved_volume = start_vol;
+
   volume_packet[0] = 0x02;
   loudness_packet[0] = 0x02;
   volume_packet[1] = 0x02;
@@ -153,27 +257,36 @@ void setup ()
   digitalWrite(mcuCS, !digitalRead(mcuSTATUS));
   attachInterrupt(digitalPinToInterrupt(mcuSTATUS), mcuStatusChange, CHANGE);
 
-  // Enable SPI1 and AFIO clocks directly (SPI.begin() may target SPI2 on some cores).
-  // RCC APB2ENR (0x40021018): bit 0 = AFIOEN, bit 12 = SPI1EN
-  volatile uint32_t *rcc_apb2enr = (volatile uint32_t*)0x40021018;
-  *rcc_apb2enr |= (1u << 0) | (1u << 12);
-  // Clear AFIO SPI1_REMAP (bit 0 of AFIO_MAPR) → default pins PA4-PA7
-  volatile uint32_t *afio_mapr = (volatile uint32_t*)0x40010004;
-  *afio_mapr &= ~(1u << 0);
+  // Enable SPI1 and AFIO clocks
+  RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_SPI1EN;
+  // Disable JTAG, keep SWD (SWJ_CFG=010) → frees PB3/PB4 for GPIO; clear SPI1_REMAP → default pins PA4-PA7
+  AFIO->MAPR = (AFIO->MAPR & ~(AFIO_MAPR_SWJ_CFG | AFIO_MAPR_SPI1_REMAP)) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
 
   // PA4/NSS, PA5/SCK, PA7/MOSI must be INPUT before enabling SPI1
-  gpio_set_mode(GPIOA, 4, GPIO_INPUT_FLOATING);  // NSS driven via PA3→inverter
-  gpio_set_mode(GPIOA, 5, GPIO_INPUT_FLOATING);
-  gpio_set_mode(GPIOA, 7, GPIO_INPUT_FLOATING);
+  pinMode(PA4, INPUT);  // NSS driven via PA3→inverter
+  pinMode(PA5, INPUT);
+  pinMode(PA7, INPUT);
 
   // SPI1 slave: SSM=0 → hardware NSS (PA4).  NSS LOW = selected = shift reg active.
   // PA3 HIGH → inverter → PA4 LOW → NSS LOW → SPI1 counts 8 CLK edges → RXNE.
   // PA3 LOW  → inverter → PA4 HIGH → NSS HIGH → shift reg resets → byte framed.
-  SPI1->regs->CR1 = 0;  // MSTR=0, SSM=0, CPOL=0, CPHA=0
-  SPI1->regs->CR1 |= SPI_CR1_SPE;
-  SPI1->regs->CR2 = 0;  // no interrupts; loop() polls SR
+  SPI1->CR1 = 0;  // MSTR=0, SSM=0, CPOL=0, CPHA=0
+  SPI1->CR1 |= SPI_CR1_SPE;
+  SPI1->CR2 = 0;  // no interrupts; loop() polls SR
 
   pinMode(displayRESET, INPUT);
+
+  // GALA: TIM2 at 1µs resolution for speed pulse measurement
+  if (cfg.gala > 0) {
+    pinMode(GALA_PIN, INPUT_PULLDOWN);
+    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+    TIM2->PSC = 71;       // 72MHz / (71+1) = 1MHz = 1µs ticks
+    TIM2->ARR = 0xFFFF;
+    TIM2->CNT = 0;
+    TIM2->CR1 = 0;        // stopped
+    TIM2->EGR = TIM_EGR_UG;  // force update to load PSC/ARR
+    attachInterrupt(digitalPinToInterrupt(GALA_PIN), galaRising, RISING);
+  }
 
 #ifdef USE_SERIAL
   USEDSERIAL.begin(115200);
@@ -189,15 +302,59 @@ void printInfo() {
   USEDSERIAL.println(F("(C) kovo, GPL3"));
   USEDSERIAL.println(F("https://www.tindie.com/products/tomaskovacik/volume-fix-for-audi-concert1chorus1/"));
   USEDSERIAL.println(F("https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix"));
+  // CFG_LOAD: config loaded from flash at startup
+  USEDSERIAL.print(F("CFG_LOAD: vol=")); USEDSERIAL.print(cfg.vol);
+  USEDSERIAL.print(F(" gala="));        USEDSERIAL.print(cfg.gala);
+  USEDSERIAL.print(F(" ta="));          USEDSERIAL.println(cfg.ta);
+  if (cfg.gala > 0) {
+    USEDSERIAL.print(F("CFG_LOAD: GALA base_thr="));
+    USEDSERIAL.print(100 - (cfg.gala - 1) * 15);
+    USEDSERIAL.println(F(" km/h"));
+  } else {
+    USEDSERIAL.println(F("CFG_LOAD: GALA disabled (send g1..g5 to enable)"));
+  }
 }
 
 void loop()
 {
 #ifdef USE_SERIAL
-  if (Serial.available()) {
-    if (Serial.read() == 'v') printInfo();
+  if (USEDSERIAL.available()) {
+    char ch = USEDSERIAL.read();
+    bool changed = false;
+    if (ch == 'v' || ch == 'V' || ch == 'h' || ch == 'H' || ch == '?') {
+      printInfo();
+    } else if (ch == 's' && USEDSERIAL.available()) {
+      uint8_t level = USEDSERIAL.read() - '0';
+      if (level >= 1 && level <= 5) { cfg.vol = level; changed = true; }
+    } else if (ch == 'g' && USEDSERIAL.available()) {
+      uint8_t level = USEDSERIAL.read() - '0';
+      if (level <= 5) { cfg.gala = level; changed = true; }
+    }
+    if (changed) {
+      if (writeConfig(cfg)) {
+        USEDSERIAL.println(F("Config saved. Restart to apply."));
+      } else {
+        USEDSERIAL.println(F("Config write FAILED."));
+      }
+      printInfo();
+    }
   }
 #endif
+
+  // displayRESET edge: reload start volume from config when radio panel wakes up
+  bool reset_high = digitalRead(displayRESET);
+  if (reset_high && !displayRESETstate) {
+    displayRESETstate = true;
+    uint8_t start_vol = volLevelToHex(cfg.vol);
+    volume = current_volume = saved_volume = start_vol;
+#ifdef USE_SERIAL
+    USEDSERIAL.println(F("Reset HIGH — reloaded start volume"));
+#endif
+  }
+  if (!reset_high && displayRESETstate) {
+    displayRESETstate = false;
+  }
+
   if (!panel_message.busy) {
     while (panel_message.available()) {
       uint8_t _data[howmanybytesinpacket];
@@ -209,11 +366,11 @@ void loop()
       }
 #endif
       if (_data[0] == 0x25) {
-        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) {
+        if (grab_volume && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) {
           set_volume_up();
           set_volume();
         }
-        if (grab_volume == 1 && (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) {
+        if (grab_volume && (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) {
           set_volume_down();
           set_volume();
         }
@@ -229,11 +386,12 @@ void loop()
       uint8_t _data[howmanybytesinpacket];
       i2c_data.read(_data);
 #ifdef USE_SERIAL
-      USEDSERIAL.print(F("I2C"));
-      for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
-        USEDSERIAL.print(' '); USEDSERIAL.print(_data[i], HEX);
-      }
-      USEDSERIAL.println();
+      // incoming I2C from radio (HC05 → TDA7342) — disabled, use TDA for outgoing
+      // USEDSERIAL.print(F("I2C"));
+      // for (uint8_t i = 0; i < howmanybytesinpacket; i++) {
+      //   USEDSERIAL.print(' '); USEDSERIAL.print(_data[i], HEX);
+      // }
+      // USEDSERIAL.println();
 #endif
       if ((_data[1] & 0x0f) == 1 || (_data[1] & 0x0F) == 2) {
         // volume/loudness packet from panel — ignore, we control volume ourselves
@@ -259,11 +417,76 @@ void loop()
       }
     }
   }
+
+  // ── GALA speed-based volume ──────────────────────────────────────────────
+  if (cfg.gala > 0 && gala_captime > 0) {
+    uint16_t pulse_width_us = gala_captime;
+    gala_captime = 0;
+
+    // Rolling average of last GALA_AVG_N pulse widths to suppress µs jitter
+    gala_pulse_buf[gala_pulse_idx] = pulse_width_us;
+    gala_pulse_idx = (gala_pulse_idx + 1) % GALA_AVG_N;
+    if (gala_pulse_idx == 0) gala_buf_full = true;
+    uint8_t n = gala_buf_full ? GALA_AVG_N : gala_pulse_idx;
+    uint32_t sum = 0;
+    for (uint8_t i = 0; i < n; i++) sum += gala_pulse_buf[i];
+    uint16_t avg_pulse_us = (uint16_t)(sum / n);
+
+    uint16_t speed_kmh = (uint16_t)(1000000UL / (2UL * avg_pulse_us));
+
+    if (gala_prev_speed != speed_kmh) {
+      // Speed threshold base and 30 km/h steps: vol up / loudness down as speed rises
+      uint16_t base_speed_thr = (uint16_t)(100 - (cfg.gala - 1) * 15);
+#ifdef USE_SERIAL
+      USEDSERIAL.print(F("GALA_SPEED: ")); USEDSERIAL.print(gala_prev_speed);
+      USEDSERIAL.print(F("->")); USEDSERIAL.print(speed_kmh);
+      USEDSERIAL.print(F(" km/h pulse_us=")); USEDSERIAL.print(avg_pulse_us);
+      USEDSERIAL.print(F(" base_thr=")); USEDSERIAL.println(base_speed_thr);
+#endif
+
+      // Going faster — step volume up and loudness down at each 30 km/h band
+      for (uint8_t band = 0; band < 5; band++) {
+        uint16_t vol_speed_thr  = base_speed_thr + band * 30;
+        uint16_t loud_speed_thr = vol_speed_thr + 15;
+        if (gala_prev_speed <= vol_speed_thr && vol_speed_thr < speed_kmh) {
+          set_volume_up(); set_volume();
+#ifdef USE_SERIAL
+          USEDSERIAL.print(F("GALA_VOL: UP band=")); USEDSERIAL.print(band);
+          USEDSERIAL.print(F(" thr=")); USEDSERIAL.print(vol_speed_thr);
+          USEDSERIAL.print(F(" vol=0x")); USEDSERIAL.println(volume, HEX);
+#endif
+        }
+        if (gala_prev_speed <= loud_speed_thr && loud_speed_thr < speed_kmh && loudness > 0x06) {
+          loudness--; current_loudness = loudness + 1; set_loudness();
+#ifdef USE_SERIAL
+          USEDSERIAL.print(F("GALA_LOUD: DOWN band=")); USEDSERIAL.print(band);
+          USEDSERIAL.print(F(" thr=")); USEDSERIAL.print(loud_speed_thr);
+          USEDSERIAL.print(F(" loud=0x")); USEDSERIAL.println(loudness, HEX);
+#endif
+        }
+        // Slowing down — step volume down and loudness up
+        if (speed_kmh < vol_speed_thr && vol_speed_thr <= gala_prev_speed) {
+          set_volume_down(); set_volume();
+#ifdef USE_SERIAL
+          USEDSERIAL.print(F("GALA_VOL: DOWN band=")); USEDSERIAL.print(band);
+          USEDSERIAL.print(F(" thr=")); USEDSERIAL.print(vol_speed_thr);
+          USEDSERIAL.print(F(" vol=0x")); USEDSERIAL.println(volume, HEX);
+#endif
+        }
+        if (speed_kmh < loud_speed_thr && loud_speed_thr <= gala_prev_speed && loudness < 0x0E) {
+          loudness++; current_loudness = loudness - 1; set_loudness();
+#ifdef USE_SERIAL
+          USEDSERIAL.print(F("GALA_LOUD: UP band=")); USEDSERIAL.print(band);
+          USEDSERIAL.print(F(" thr=")); USEDSERIAL.print(loud_speed_thr);
+          USEDSERIAL.print(F(" loud=0x")); USEDSERIAL.println(loudness, HEX);
+#endif
+        }
+      }
+    }
+    gala_prev_speed = speed_kmh;
+  }
 }
 
-/*
-   send mute data over i2c
-*/
 void set_mute() {
   if (!mute) {
     mute = true;
@@ -271,9 +494,6 @@ void set_mute() {
     sendI2C(mute_data);
   }
 }
-/*
-   send unmute data over i2c
-*/
 void set_unmute() {
   if (mute) {
     mute = false;
@@ -345,8 +565,8 @@ void set_loudness()
   } else if (volume > 0x5E) {
     loudness = 0x0D;
   } else {
-    int8_t l = 0x0C - (int8_t)((0x5E - volume) / 4);
-    loudness = (l < 0x06) ? 0x06 : (uint8_t)l;
+    int8_t loud_calc = 0x0C - (int8_t)((0x5E - volume) / 4);
+    loudness = (loud_calc < 0x06) ? 0x06 : (uint8_t)loud_calc;
   }
   while (current_loudness != loudness) {
     if (current_loudness < loudness) {
@@ -360,46 +580,72 @@ void set_loudness()
 }
 
 /*
-
-   decoding display data  parameter is array with data packet
-   I try to send just pointer, cose data array is not local, we can access it everywhere
-   but it will get 1% more of storage program and it's probably not faster ...
-
-   packet struckture:
-   1st byte in packet is packet definition or something,.... it's always 0x96
-   2nd byte in packet identified data send in packet:
-          - 0x48 - plain asci data to display
-          - 0x13 - leds on buttons indicating mode/functions
-                  -3th byte: [nan|I|I|I|FM|AS|RDS|REG]
-                              - 5th bit is  "pipe" between FM lethers, which make AM symbol something like F|M
-                              - 6th and 7th bits are same "pipe" which made FM 1 and FM 2 like FM I(I)
-                  - 4th byte: [nan|nan|nan|RD|Dolby|CPS|presets|presets]
-                              - 0th and 1st bit are for stations presets 1,2,3,4,5,6
-                  - 5th byte: LEDS [nan|MODE|AS|SCAN|FM|TP|AM|RDS]
-
-          - 0x32 AM/FM frequency display
-                  - 3th byte:??
-                  - 4th byte: actual freq:
-                      AM mode: (531+(9*4th byte)) in kHz
-                      FM mode: (875+4th byte)/10 in Mhz
-          - 0xA2 CD changer mode
-                 - 3th packet is CD number, in hex (but here it's not important, we have only 6CD)
-                 - 4th packet is Track number, again in hex, but no ABCDEF is used ...
-          - 0x23 - display clear.
-          - 0x61 - TAPE mode (display shows TAPE)
-                   3th byte: 1/2 indicate direction of playback (/\ or \/)
-                             3/4 indicate fast forward or rewind (< or > )
-                             0 indicate eject
-
+   SPI packet structure (0x9A packets):
+   byte 0: 0x9A (packet type)
+   byte 1: subtype:
+     0x48: ASCII display text
+     0x13: button/mode LEDs (bytes 2-4: mode flags)
+     0x32: AM/FM frequency
+     0xA2: CD changer (byte 2: disc, byte 3: track)
+     0x23: display clear
+     0x61: tape mode (byte 2: direction/fwd/rew/eject)
+     0x58: settings menu — ASCII text (bytes 2-9), e.g. "VOL  3  ", "GALA 2  ", "GALA OFF"
+     0x71: tone/balance menu (byte 2 upper nibble: BAS/TRE/BAL/FAD selector)
 */
 
 void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
-  grab_volume = 1;
+  grab_volume = true;
 
-  // grab_volume logic: suppress volume knob handling while panel shows
-  // bass/treble/balance/fade/volume-setting menus
-  if (_data[1] == 0x58) grab_volume = 0;                    // settings menu text
-  if (_data[1] == 0x71 && (_data[2] >> 4) <= 7) grab_volume = 0; // BAS/TRE/BAL/FAD
+  if (_data[1] == 0x58) {
+    // Settings menu: suppress volume knob and auto-save config from display text
+    grab_volume = false;
+
+    // "VOL  X  " — start volume level 1-5 (bytes 2-9)
+    if (_data[2]=='V' && _data[3]=='O' && _data[4]=='L' && _data[5]==' '
+        && _data[6]==' ' && _data[8]==' ' && _data[9]==' ') {
+      uint8_t level = _data[7] - '0';
+      if (level >= 1 && level <= 5) {
+        cfg.vol = level;
+#ifdef USE_SERIAL
+        USEDSERIAL.print(F("CFG_PANEL: vol=")); USEDSERIAL.println(cfg.vol);
+#endif
+        writeConfig(cfg);
+      }
+    }
+    // "TA   X  " — TA level 1-5
+    if (_data[2]=='T' && _data[3]=='A' && _data[4]==' ' && _data[5]==' '
+        && _data[6]==' ' && _data[8]==' ' && _data[9]==' ') {
+      uint8_t level = _data[7] - '0';
+      if (level >= 1 && level <= 5) {
+        cfg.ta = level;
+#ifdef USE_SERIAL
+        USEDSERIAL.print(F("CFG_PANEL: ta=")); USEDSERIAL.println(cfg.ta);
+#endif
+        writeConfig(cfg);
+      }
+    }
+    // "GALA OFF" or "GALA X  " — GALA level 0-5
+    if (_data[2]=='G' && _data[3]=='A' && _data[4]=='L' && _data[5]=='A' && _data[6]==' ') {
+      if (_data[7]=='O' && _data[8]=='F' && _data[9]=='F') {
+        cfg.gala = 0;
+#ifdef USE_SERIAL
+        USEDSERIAL.println(F("CFG_PANEL: gala=0 (OFF)"));
+#endif
+        writeConfig(cfg);
+      } else if (_data[8]==' ' && _data[9]==' ') {
+        uint8_t level = _data[7] - '0';
+        if (level >= 1 && level <= 5) {
+          cfg.gala = level;
+#ifdef USE_SERIAL
+          USEDSERIAL.print(F("CFG_PANEL: gala=")); USEDSERIAL.println(cfg.gala);
+#endif
+          writeConfig(cfg);
+        }
+      }
+    }
+  }
+
+  if (_data[1] == 0x71 && (_data[2] >> 4) <= 7) grab_volume = false; // BAS/TRE/BAL/FAD
 
 #ifdef USE_SERIAL
   USEDSERIAL.print(F("SPI"));
@@ -419,8 +665,8 @@ void mcuStatusChange()
         digitalWrite(mcuCS, LOW);   // PA3 LOW → inverter → NSS HIGH
 
         // Harvest the completed byte immediately — before loop() gets a chance to run
-        if (SPI1->regs->SR & SPI_SR_RXNE) {
-            uint8_t b = (uint8_t)SPI1->regs->DR;
+        if (SPI1->SR & SPI_SR_RXNE) {
+            uint8_t b = (uint8_t)SPI1->DR;
             panel_message.write(b);
             if (panel_message.wbp == howmanybytesinpacket)
                 panel_message.wbp = 0; // overflow guard
@@ -453,6 +699,13 @@ void receiveEvent (int howMany)
 }
 
 void sendI2C (const uint8_t data[howmanybytesinpacket]) {
+#ifdef USE_SERIAL
+  USEDSERIAL.print(F("TDA"));
+  for (uint8_t i = 1; i <= data[0]; i++) {
+    USEDSERIAL.print(' '); USEDSERIAL.print(data[i], HEX);
+  }
+  USEDSERIAL.println();
+#endif
   SWire.beginTransmission(MY_ADDRESS);
 
   for (byte i = 0 ; i < data[0]; i++) {

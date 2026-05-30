@@ -9,9 +9,9 @@ BUILDER  := /opt/arduino-nightly/arduino-builder
 ST_FLASH := /home/nail/src/stlink/build/Release/bin/st-flash
 DECODER  := $(abspath ../decoder.py)
 
-STM32_CORE_PATH := /home/nail/.arduino15/packages/STMicroelectronics/hardware/stm32/2.4.0
-GCC_PATH        := /home/nail/.arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/10.3.1-2.3
-STM32TOOLS_PATH := /home/nail/.arduino15/packages/STMicroelectronics/tools/STM32Tools/2.1.1
+STM32_CORE_PATH := /home/nail/.arduino15/packages/STMicroelectronics/hardware/stm32/2.12.0
+GCC_PATH        := /home/nail/.arduino15/packages/STMicroelectronics/tools/xpack-arm-none-eabi-gcc/14.2.1-1.1
+STM32TOOLS_PATH := /home/nail/.arduino15/packages/STMicroelectronics/tools/STM32Tools/2.4.0
 
 BFLAGS := \
 	-hardware /opt/arduino-nightly/hardware \
@@ -28,9 +28,9 @@ BFLAGS := \
 	-warnings=all \
 	-prefs=build.warn_data_percentage=75 \
 	-prefs=runtime.tools.xpack-arm-none-eabi-gcc.path=$(GCC_PATH) \
-	-prefs=runtime.tools.xpack-arm-none-eabi-gcc-10.3.1-2.3.path=$(GCC_PATH) \
+	-prefs=runtime.tools.xpack-arm-none-eabi-gcc-14.2.1-1.1.path=$(GCC_PATH) \
 	-prefs=runtime.tools.STM32Tools.path=$(STM32TOOLS_PATH) \
-	-prefs=runtime.tools.STM32Tools-2.1.1.path=$(STM32TOOLS_PATH)
+	-prefs=runtime.tools.STM32Tools-2.4.0.path=$(STM32TOOLS_PATH)
 
 .PHONY: all build upload serial clean
 

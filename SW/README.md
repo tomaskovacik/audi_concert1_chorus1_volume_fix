@@ -10,21 +10,41 @@ Audi Concert 1 / Chorus 1 head units.  Target hardware: **HWv5**.
 | Branch | Description |
 |---|---|
 | `master` | Stable HWv5 firmware, serial decoder |
-| `feature/eeprom-gala` | Adds persistent config (flash), GALA speed-volume, display auto-save |
+| `feature/eeprom-gala-isr-STM32CORE` | Official STM32 core port — persistent config (flash), GALA speed-volume, display auto-save |
+| `feature/eeprom-gala-isr-STM32CORE-sleep` | Deep sleep on displayRESET LOW — kept for reference, no real benefit with current HW |
 
 ---
 
 ## Building and flashing
 
+### Dependencies
+
+- Arduino IDE install at `/opt/arduino-nightly/`
+- **Official STMicroelectronics STM32 core 2.12+** installed via Arduino Boards Manager:
+  - Board URL: `https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json`
+  - Package: `STMicroelectronics:stm32` — select board **Generic STM32F1 series → BluePill F103C6**
+  - Tools installed automatically: `xpack-arm-none-eabi-gcc 14.2.1-1.1`, `STM32Tools 2.4.0`, `xpack-openocd 0.12.0-6`
+- **FlexWire** library (software I2C) — install via Arduino Library Manager or from source
+
+### Build targets
+
 ```bash
 cd SW/audi_volume_fix_stm32
-make build    # compile only
-make          # compile + open serial monitor
-make flash    # compile + flash via ST-Link
+make          # compile only
+make upload   # compile + flash via ST-Link (OpenOCD)
+make serial   # open serial monitor (115200 baud)
+make clean    # remove build artefacts
 ```
 
-Requires the Arduino install at `/opt/arduino-nightly/` with the
-`stm32duino:STM32F1` package.
+### Flashing
+
+Flashing uses **OpenOCD** (bundled with the official core) via ST-Link:
+
+```bash
+make upload
+```
+
+No separate `st-flash` installation needed.
 
 ---
 
@@ -53,11 +73,11 @@ Output prefixes:
 |---|---|---|
 | `SPI` | Yellow | Front-panel → MCU SPI packet (decoded) |
 | `BTN` | Red | Button / knob event |
-| `I2C` | Green | MCU → TDA7342 I2C command (decoded) |
+| `TDA` | Green | STM32 → TDA7342 I2C command (decoded) |
 
 ---
 
-## Configuration (`feature/eeprom-gala`)
+## Configuration (`feature/eeprom-gala-isr-STM32CORE`)
 
 ### Stored values
 

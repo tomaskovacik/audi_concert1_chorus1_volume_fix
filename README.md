@@ -1,3 +1,19 @@
+> ## ⚠️ v2.0.0 — Important notice
+>
+> **Firmware v2.0.0 is only suitable for HWv5 boards.** It will NOT work correctly on older hardware revisions (v1–v4).
+>
+> This release is currently **under real-life / daily-use testing**. If you experience issues, please open a [GitHub issue](https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/issues).
+>
+> ### What changed in v2.0.0 (not in release notes — no PRs were used)
+>
+> - **Switched to official STMicroelectronics STM32 Arduino core** (replaces Roger Clark's libmaple/stm32duino community core)
+> - **Hardware SPI** used for front-panel communication (via STM32 core SPI peripheral)
+> - **FlexWire** software I2C library used for TDA7342 volume chip communication on PB10/PB11  
+>   (STM32F103C6 has only one I2C peripheral; hardware I2C2 does not exist on this chip)
+> - **Persistent config** saved to last flash page (volume level, GALA, TA) — replaces EEPROM emulation from older cores
+> - **GALA** (speed-dependent volume) support via VSS pulse timing on PB5
+> - **CI** updated to build and release firmware binary automatically on git tags
+
 Software and hardware to fix volume problem on audi concert1/chorus1 units made by blaupunkt. More about this problem in [this](https://github.com/tomaskovacik/audi_concert1_chorus1_volume_fix/wiki/Problem-of-Some-AUDI-Chorus-and-AUDI-Concert-Autoradio-Models,-or-%22Delayed-Action-Mine%22-from-Blaupunkt-Company) wiki page which is copy from [here](https://web.archive.org/web/20071017195907/http://erta.ru/review/chorus-problem_eng.shtml).
 
 #### Compatible radios:

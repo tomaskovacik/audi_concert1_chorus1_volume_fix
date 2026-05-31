@@ -1,18 +1,34 @@
-// HWv5 — passive SPI sniffer for Audi Concert1/Chorus1 volume fix
-// module is held in reset state when front panel is off, no last volume is stored
+// HWv5 — dual-SPI man-in-the-middle bridge for Audi Concert1/Chorus1 volume fix
+// STM32 intercepts SPI between radio MCU and front panel, forwarding and modifying packets.
+// Define HWV5_BRIDGE to activate bridge mode (active); omit for passive sniff mode.
+//
+// Bridge pin assignment:
+//   MCU side  (SPI1 slave):  PA5=SCK, PA7=MOSI, PA15=STATUS(OUTPUT), PA3=CS
+//   Panel side (SPI2 master): PB13=SCK, PB14=MISO, PB15=MOSI, PB1=STATUS(INPUT), PA8=CS
+//   GALA: PB5 (TIM3_CH2, speed pulse from HC05 pin23 via 1kΩ — optional)
 
-/* version 5 — passive sniffer (same role as HWv1-v4, CLK/DATA via SPI1 peripheral)
+/* version 5 — bridge mode (replaces passive sniffer with active man-in-the-middle)
 mcuCLK    = PA5  (SPI1_SCK  - input, MCU drives CLK)
-mcuDATA   = PA7  (SPI1_MOSI - input, shared DATA via resistors)
-mcuSTATUS = PA15 (input, panel drives STATUS)
-GALA      = PB5  (input, TIM3_CH2, speed pulse from HC05 pin23 via 1kΩ — optional feature)
+mcuDATA   = PA7  (SPI1_MOSI - data received by STM32 in slave mode)
+mcuSTATUS = PA15 (OUTPUT: STM32 drives STATUS to MCU, acting as front panel)
+mcuCS     = PA3  (output: hw-inverted PA15, mirrors SPI1_NSS on board)
+panelCLK    = PB13 (SPI2_SCK  output to panel)
+panelMOSI   = PB15 (SPI2_MOSI output to panel)
+panelMISO   = PB14 (SPI2_MISO input from panel)
+panelSTATUS = PB1  (input: panel drives STATUS)
+panelCS     = PA8  (output: hw-inverted PB1)
 */
+#define HWV5_BRIDGE
 #include <SPI.h>
 #include <Wire.h>
 #include <FlexWire.h>
 #include "audi_concert_panel.h"
 
 FlexWire SWire = FlexWire(PB11, PB10);
+
+#ifdef HWV5_BRIDGE
+SPIClass SPI_2(PB15, PB14, PB13);  // SPI2: PB13=SCK, PB14=MISO, PB15=MOSI (panel side master)
+#endif
 
 #define USE_SERIAL
 #define USEDSERIAL Serial1
@@ -56,6 +72,14 @@ FlexWire SWire = FlexWire(PB11, PB10);
 #define mcuDATA   PA7  // SPI1_MOSI - shared DATA via resistors (input, passive sniff)
 #define mcuCS     PA3  // output: mirrors STATUS → HW inverter → SPI1_NSS (PA4)
 #define mcuSTATUS PA15
+#ifdef HWV5_BRIDGE
+// Panel side (SPI2 master) — STM32 acts as Audi MCU toward front panel
+#define panelCLK    PB13  // SPI2_SCK  - output to panel
+#define panelMOSI   PB15  // SPI2_MOSI - output to panel (10k resistor in HW)
+#define panelMISO   PB14  // SPI2_MISO - input from panel (1k resistor in HW)
+#define panelSTATUS PB1   // STATUS from panel (input, panel drives this)
+#define panelCS     PA8   // CS to panel: output = !PB1 (hw wired to PB12 for inversion)
+#endif
 #define displayRESET PB8
 #define VERSION "2.1-25.05.26-HWv5"
 
@@ -123,6 +147,38 @@ volatile uint8_t _i2c_data_buf[howmanypackets * howmanybytesinpacket];  // I2C d
 CircularPacketBuffer panel_message = { _panel_msg_buf, 0, 0, 0, false }; // SPI front panel messages
 CircularPacketBuffer i2c_data      = { _i2c_data_buf,  0, 0, 0, false }; // I2C packets from MCU
 
+#ifdef HWV5_BRIDGE
+// ── Bridge circular buffers (SPI1↔SPI2 man-in-the-middle) ────────────────────────
+#define CIRC_BUF_SIZE 256
+struct CircBuf {
+    volatile uint8_t  data[CIRC_BUF_SIZE];
+    volatile uint16_t head = 0, tail = 0;
+    void push(uint8_t b) { uint16_t n=(head+1)%CIRC_BUF_SIZE; if(n!=tail){data[head]=b;head=n;} }
+    bool pop(uint8_t &b) { if(head==tail)return false; b=data[tail]; tail=(tail+1)%CIRC_BUF_SIZE; return true; }
+    bool empty() const { return head==tail; }
+    bool full()  const { return ((head+1)%CIRC_BUF_SIZE)==tail; }
+};
+CircBuf mcu_to_panel;  // SPI1 RX → SPI2 TX  (MCU→panel display data)
+CircBuf panel_to_mcu;  // SPI2 RX → SPI1 TX  (panel→MCU button data)
+
+// Direct packet array for MCU→panel data (populated by SPI1 ISR)
+volatile uint8_t _msg[howmanypackets][howmanybytesinpacket];
+volatile uint8_t dwdp = 0;   // write packet pointer (ISR)
+volatile uint8_t dwbp = 0;   // write byte pointer (ISR)
+volatile uint8_t drdp = 0;   // read packet pointer (loop)
+volatile uint8_t grabbing_SPI = 0;  // set by ISR during active byte capture
+
+// Panel→MCU packet mirror array
+volatile uint8_t _panel_msg[howmanypackets][howmanybytesinpacket];
+volatile uint8_t panel_dwdp = 0, panel_dwbp = 0, panel_drdp = 0;
+volatile uint8_t panel_grabbing_SPI = 0;
+
+// Set by panelStatusChange ISR when panel wants to send button data
+volatile uint8_t panel_wants_to_send = 0;
+// Set in loop() when we signal MCU that panel has button data via STATUS LOW
+volatile uint8_t mcu_read_initiated = 0;
+#endif
+
 Config cfg;  // loaded once in setup(), updated on serial command
 
 volatile uint8_t volume         = 0xBA;
@@ -160,6 +216,13 @@ void set_loudness();
 void set_mute();
 void set_unmute();
 void receiveEvent(int howMany);
+#ifdef HWV5_BRIDGE
+void mcuClkChange();
+void spi1ByteReceived();
+void panelStatusChange();
+void receivePanelPacket();
+void sendToPanel();
+#endif
 
 // ── Config (raw flash, 1KB page) ──────────────────────────────────────────
 
@@ -251,16 +314,48 @@ void setup ()
   Wire.onReceive (receiveEvent);
   SWire.begin();
 
-  // STATUS ISR gates NSS (PA3→PA4/NSS) so
+  // Enable SPI1 and AFIO clocks
+  RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_SPI1EN;
+  // Disable JTAG, keep SWD (SWJ_CFG=010) → frees PB3/PB4/PA15 for GPIO; clear SPI1_REMAP → default pins
+  AFIO->MAPR = (AFIO->MAPR & ~(AFIO_MAPR_SWJ_CFG | AFIO_MAPR_SPI1_REMAP)) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
+
+#ifdef HWV5_BRIDGE
+  // ── Bridge mode: STM32 acts AS front panel to radio MCU ──────────────────────────
+  // STM32 drives STATUS (PA15) as output; watches CLK (PA5) for byte framing.
+  // SPI1 slave with software NSS + RXNE interrupt for byte capture.
+  pinMode(mcuCLK, INPUT_PULLUP);   // PA5: SCK from MCU (input)
+  attachInterrupt(digitalPinToInterrupt(mcuCLK), mcuClkChange, CHANGE);
+  pinMode(mcuDATA, INPUT_PULLUP);  // PA7: MOSI from MCU (input)
+  pinMode(mcuSTATUS, OUTPUT);      // PA15: STM32 drives STATUS to MCU (output)
+  digitalWrite(mcuSTATUS, HIGH);   // idle HIGH
+  pinMode(mcuCS, OUTPUT);          // PA3: hardware-inverted STATUS → PA4/NSS
+  digitalWrite(mcuCS, LOW);        // STATUS HIGH → CS LOW
+  // SPI1 slave: call SPI.begin() to configure AF pins, then patch to slave mode
+  SPI.begin();
+  SPI1->CR1 &= ~SPI_CR1_SPE;
+  SPI1->CR1 &= ~SPI_CR1_MSTR;
+  SPI1->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI; // software NSS, always selected; CPOL=0, CPHA=0
+  SPI1->CR1 |= SPI_CR1_SPE;
+  SPI1->DR   = 0x00;                       // pre-load MISO idle value
+  SPI1->CR2 |= SPI_CR2_RXNEIE;            // fire SPI1_IRQHandler on each received byte
+  NVIC_EnableIRQ(SPI1_IRQn);
+
+  // ── Bridge mode: STM32 acts AS radio MCU to front panel ──────────────────────────
+  // Panel drives STATUS; STM32 drives CLK (PB13) between packets as GPIO HIGH.
+  // SPI2 is only activated inside sendToPanel()/receivePanelPacket().
+  pinMode(panelCLK, OUTPUT);
+  digitalWrite(panelCLK, HIGH);      // CLK idle HIGH = no transfer in progress
+  pinMode(panelSTATUS, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(panelSTATUS), panelStatusChange, CHANGE);
+  pinMode(panelCS, OUTPUT);
+  digitalWrite(panelCS, LOW);        // STATUS idle HIGH → CS LOW
+#else
+  // ── Sniff mode: passive monitoring of MCU↔panel SPI bus ─────────────────────────
+  // STATUS ISR gates NSS (PA3→PA4/NSS) to frame each byte.
   pinMode(mcuSTATUS, INPUT_PULLUP);
   pinMode(mcuCS, OUTPUT);
   digitalWrite(mcuCS, !digitalRead(mcuSTATUS));
   attachInterrupt(digitalPinToInterrupt(mcuSTATUS), mcuStatusChange, CHANGE);
-
-  // Enable SPI1 and AFIO clocks
-  RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_SPI1EN;
-  // Disable JTAG, keep SWD (SWJ_CFG=010) → frees PB3/PB4 for GPIO; clear SPI1_REMAP → default pins PA4-PA7
-  AFIO->MAPR = (AFIO->MAPR & ~(AFIO_MAPR_SWJ_CFG | AFIO_MAPR_SPI1_REMAP)) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
 
   // PA4/NSS, PA5/SCK, PA7/MOSI must be INPUT before enabling SPI1
   pinMode(PA4, INPUT);  // NSS driven via PA3→inverter
@@ -268,11 +363,10 @@ void setup ()
   pinMode(PA7, INPUT);
 
   // SPI1 slave: SSM=0 → hardware NSS (PA4).  NSS LOW = selected = shift reg active.
-  // PA3 HIGH → inverter → PA4 LOW → NSS LOW → SPI1 counts 8 CLK edges → RXNE.
-  // PA3 LOW  → inverter → PA4 HIGH → NSS HIGH → shift reg resets → byte framed.
   SPI1->CR1 = 0;  // MSTR=0, SSM=0, CPOL=0, CPHA=0
   SPI1->CR1 |= SPI_CR1_SPE;
   SPI1->CR2 = 0;  // no interrupts; loop() polls SR
+#endif
 
   pinMode(displayRESET, INPUT);
 
@@ -355,6 +449,70 @@ void loop()
     displayRESETstate = false;
   }
 
+#ifdef HWV5_BRIDGE
+  // ── SPI bridge forwarding ────────────────────────────────────────────────────────
+  // Panel-initiated button press: panelStatusChange ISR detected STATUS FALLING
+  // with CLK HIGH and already drove CLK LOW. Complete byte exchange here.
+  if (panel_wants_to_send && !panel_grabbing_SPI) {
+    receivePanelPacket();
+  }
+
+  // MCU→panel display forward: send queued bytes to panel via SPI2.
+  if (!panel_grabbing_SPI && !mcu_to_panel.empty()) {
+    sendToPanel();
+  }
+
+  // Panel→MCU button forwarding: signal MCU (drive STATUS LOW while CLK HIGH),
+  // then SPI1 clocks out the pre-loaded button byte via MISO.
+  if (!grabbing_SPI && !mcu_read_initiated && !panel_to_mcu.empty()) {
+    uint8_t tx;
+    if (panel_to_mcu.pop(tx)) {
+      noInterrupts();
+      SPI1->DR = tx;
+      mcu_read_initiated = 1;
+      digitalWrite(mcuCS, HIGH);
+      digitalWrite(mcuSTATUS, LOW);   // "panel has data" interrupt to MCU
+      interrupts();
+      uint32_t t = micros();
+      while (!grabbing_SPI && (micros() - t) < 5000);
+      if (!grabbing_SPI) {
+        mcu_read_initiated = 0;
+        SPI1->DR = 0x00;
+        digitalWrite(mcuSTATUS, HIGH);
+        digitalWrite(mcuCS, LOW);
+      }
+    }
+  }
+#endif
+
+#ifdef HWV5_BRIDGE
+  if (!grabbing_SPI) {
+    while (drdp != dwdp) {
+      uint8_t _data[howmanybytesinpacket];
+      for (uint8_t i = 0; i < howmanybytesinpacket; i++) _data[i] = _msg[drdp][i];
+#ifdef USE_SERIAL
+      if (_data[0] == 0x25) {
+        USEDSERIAL.print(F("BTN "));
+        USEDSERIAL.println(_data[1], HEX);
+      }
+#endif
+      if (_data[0] == 0x25) {
+        if (grab_volume && (_data[1] == PANEL_KNOB_UP || _data[1] == PANEL_REMOTE_VOLUME_UP)) {
+          set_volume_up();
+          set_volume();
+        }
+        if (grab_volume && (_data[1] == PANEL_KNOB_DOWN || _data[1] == PANEL_REMOTE_VOLUME_DOWN)) {
+          set_volume_down();
+          set_volume();
+        }
+      }
+      if (_data[0] == 0x9A) {
+        decode_display_data(_data);
+      }
+      drdp++; if (drdp == howmanypackets) drdp = 0;
+    }
+  }
+#else
   if (!panel_message.busy) {
     while (panel_message.available()) {
       uint8_t _data[howmanybytesinpacket];
@@ -381,6 +539,7 @@ void loop()
 
     }
   }
+#endif
   if (!i2c_data.busy) {
     while (i2c_data.available()) {
       uint8_t _data[howmanybytesinpacket];
@@ -656,6 +815,7 @@ void decode_display_data(uint8_t _data[howmanybytesinpacket]) {
 #endif
 }
 
+#ifndef HWV5_BRIDGE
 // STATUS LOW  → NSS LOW  → SPI1 selected → counts 8 CLK edges → RXNE set.
 // STATUS HIGH → NSS HIGH → SPI1 deselected → byte complete, read DR here in ISR.
 void mcuStatusChange()
@@ -683,6 +843,7 @@ void mcuStatusChange()
         panel_message.busy = 1;
     }
 }
+#endif // !HWV5_BRIDGE
 
 // called by interrupt service routine when incoming data arrives
 void receiveEvent (int howMany)
@@ -713,3 +874,164 @@ void sendI2C (const uint8_t data[howmanybytesinpacket]) {
   }
   SWire.endTransmission();
 }
+
+#ifdef HWV5_BRIDGE
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Bridge ISRs: MCU side (SPI1 slave) + Panel side (SPI2 master)
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+// ── MCU side: CLK-edge state machine ────────────────────────────────────────────────
+// CLK FALLING: MCU starts a byte transfer. Mimic panel: ACK with STATUS LOW→HIGH.
+// CLK RISING:  End of packet. Grab last byte, close packet, return STATUS to idle.
+void mcuClkChange()
+{
+    if (!digitalRead(mcuCLK)) {
+        // CLK LOW — MCU starts byte transfer
+        grabbing_SPI = 1;
+        digitalWrite(mcuCS, HIGH);
+        digitalWrite(mcuSTATUS, LOW);
+        digitalWrite(mcuSTATUS, HIGH);
+        digitalWrite(mcuCS, LOW);
+        // Flush any stale RX before new byte arrives
+        if (SPI1->SR & SPI_SR_RXNE) (void)SPI1->DR;
+    } else {
+        // CLK HIGH — end of packet
+        if (SPI1->SR & SPI_SR_RXNE) {
+            uint8_t b = (uint8_t)SPI1->DR;
+            if (!mcu_read_initiated) {
+                _msg[dwdp][dwbp++] = b;
+                mcu_to_panel.push(b);
+            }
+        }
+        while (dwbp < howmanybytesinpacket) _msg[dwdp][dwbp++] = 0;
+        dwbp = 0;
+        dwdp++; if (dwdp == howmanypackets) dwdp = 0;
+        grabbing_SPI = 0;
+        mcu_read_initiated = 0;
+        digitalWrite(mcuSTATUS, HIGH);
+        digitalWrite(mcuCS, LOW);
+    }
+}
+
+// SPI1 RXNE — byte fully clocked in from MCU mid-packet.
+inline void spi1ByteReceived()
+{
+    uint8_t b = (uint8_t)SPI1->DR;
+    if (!mcu_read_initiated) {
+        _msg[dwdp][dwbp++] = b;
+        if (dwbp == howmanybytesinpacket) dwbp = 0;
+        mcu_to_panel.push(b);
+    }
+    uint8_t tx;
+    SPI1->DR = panel_to_mcu.pop(tx) ? tx : 0x00;
+    // STATUS LOW→HIGH = byte done, ready for next
+    digitalWrite(mcuCS, HIGH);
+    digitalWrite(mcuSTATUS, LOW);
+    digitalWrite(mcuSTATUS, HIGH);
+    digitalWrite(mcuCS, LOW);
+}
+
+extern "C" void SPI1_IRQHandler(void);
+extern "C" void SPI1_IRQHandler(void)
+{
+    if (SPI1->SR & SPI_SR_RXNE) spi1ByteReceived();
+}
+
+// ── Panel side: STATUS-edge state machine ───────────────────────────────────────────
+// STATUS FALLING while CLK HIGH  → panel has button data; drive CLK LOW to ack.
+// STATUS FALLING while CLK LOW   → byte-done handshake (sendToPanel handles it).
+// STATUS RISING                  → panel ready for next byte.
+void panelStatusChange()
+{
+    if (digitalRead(panelSTATUS)) {
+        digitalWrite(panelCS, LOW);   // STATUS HIGH → CS LOW
+    } else {
+        digitalWrite(panelCS, HIGH);  // STATUS LOW → CS HIGH
+        if (digitalRead(panelCLK)) {
+            // CLK idle (HIGH): panel "I have data" interrupt
+            digitalWrite(panelCLK, LOW);  // ACK: drive CLK LOW
+            panel_wants_to_send = 1;
+        }
+        // If CLK already LOW: byte-done during sendToPanel() — it handles it
+    }
+}
+
+// ── Receive one button-press packet from panel via SPI2 ─────────────────────────────
+// Called from loop() after panelStatusChange() set panel_wants_to_send.
+// CLK is already LOW (driven in ISR). Bring SPI2 up; clock bytes until done.
+void receivePanelPacket()
+{
+    panel_wants_to_send = 0;
+    panel_grabbing_SPI  = 1;
+
+    SPI_2.begin();
+    SPI_2.setBitOrder(MSBFIRST);
+    SPI_2.setDataMode(SPI_MODE0);
+
+    uint32_t t;
+    for (;;) {
+        t = micros();
+        while (!digitalRead(panelSTATUS) && (micros() - t) < 5000);
+        if (!digitalRead(panelSTATUS)) break;  // timeout
+
+        uint8_t rx = SPI_2.transfer(0x00);
+        panel_to_mcu.push(rx);
+        _panel_msg[panel_dwdp][panel_dwbp] = rx;
+        if (++panel_dwbp == howmanybytesinpacket) panel_dwbp = 0;
+
+        t = micros();
+        while (digitalRead(panelSTATUS) && (micros() - t) < 5000);
+
+        delayMicroseconds(200);
+        if (!digitalRead(panelSTATUS)) break;  // STATUS still LOW → packet done
+    }
+
+    SPI_2.end();
+    pinMode(panelCLK, OUTPUT);
+    digitalWrite(panelCLK, HIGH);
+    panel_grabbing_SPI = 0;
+
+    while (panel_dwbp < howmanybytesinpacket) _panel_msg[panel_dwdp][panel_dwbp++] = 0;
+    panel_dwbp = 0;
+    panel_dwdp++; if (panel_dwdp == howmanypackets) panel_dwdp = 0;
+}
+
+// ── Transmit one display packet from mcu_to_panel buffer to panel via SPI2 ──────────
+// SPI2 is brought up per-packet (CLK LOW = start-of-packet), then torn down (CLK HIGH).
+void sendToPanel()
+{
+    if (mcu_to_panel.empty()) return;
+
+    uint8_t pkt[howmanybytesinpacket];
+    uint8_t len = 0;
+    uint8_t b;
+    while (len < howmanybytesinpacket && mcu_to_panel.pop(b)) pkt[len++] = b;
+    if (!len) return;
+
+    panel_grabbing_SPI = 1;
+
+    SPI_2.begin();
+    SPI_2.setBitOrder(MSBFIRST);
+    SPI_2.setDataMode(SPI_MODE0);
+
+    uint32_t t;
+    for (uint8_t i = 0; i < len; i++) {
+        t = micros();
+        while (!digitalRead(panelSTATUS) && (micros()-t) < 5000);
+        uint8_t rx = SPI_2.transfer(pkt[i]);
+        panel_to_mcu.push(rx);
+        t = micros();
+        while (digitalRead(panelSTATUS) && (micros()-t) < 5000);
+    }
+
+    SPI_2.end();
+    pinMode(panelCLK, OUTPUT);
+    digitalWrite(panelCLK, HIGH);
+    panel_grabbing_SPI = 0;
+
+    while (panel_dwbp < howmanybytesinpacket) _panel_msg[panel_dwdp][panel_dwbp++] = 0;
+    panel_dwbp = 0;
+    panel_dwdp++; if (panel_dwdp == howmanypackets) panel_dwdp = 0;
+}
+
+#endif // HWV5_BRIDGE

@@ -9,8 +9,8 @@ Audi Concert 1 / Chorus 1 head units.  Target hardware: **HWv5**.
 
 | Branch | Description |
 |---|---|
-| `master` | Stable HWv5 firmware, serial decoder |
-| `feature/eeprom-gala-isr-STM32CORE` | Official STM32 core port — persistent config (flash), GALA speed-volume, display auto-save |
+| `master` | Stable HWv5 firmware — passive SPI sniffer, GALA, flash config, serial decoder |
+| `dual-spi-panel-bridge` | **WIP** — HWv5 man-in-the-middle bridge: SPI1 slave (MCU side) + SPI2 master (panel side); STM32 intercepts and forwards packets in both directions. Activate with `#define HWV5_BRIDGE`; omit for passive-sniff fallback. |
 | `feature/eeprom-gala-isr-STM32CORE-sleep` | Deep sleep on displayRESET LOW — kept for reference, no real benefit with current HW |
 
 ---

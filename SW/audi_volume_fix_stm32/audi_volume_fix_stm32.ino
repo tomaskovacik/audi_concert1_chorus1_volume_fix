@@ -247,7 +247,7 @@ void setup ()
   loudness_packet[0] = 0x02;
   volume_packet[1] = 0x02;
   loudness_packet[1] = 0x01;
-  Wire.begin (MY_ADDRESS);
+  Wire.begin (MY_ADDRESS, false, false);
   Wire.onReceive (receiveEvent);
   SWire.begin();
 

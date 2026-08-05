@@ -964,9 +964,7 @@ void receivePanelPacket()
     panel_wants_to_send = 0;
     panel_grabbing_SPI  = 1;
 
-    SPI_2.begin();
-    SPI_2.setBitOrder(MSBFIRST);
-    SPI_2.setDataMode(SPI_MODE0);
+    SPI_2.begin();  // defaults to MSBFIRST, SPI_MODE0
 
     uint32_t t;
     for (;;) {
@@ -1010,9 +1008,7 @@ void sendToPanel()
 
     panel_grabbing_SPI = 1;
 
-    SPI_2.begin();
-    SPI_2.setBitOrder(MSBFIRST);
-    SPI_2.setDataMode(SPI_MODE0);
+    SPI_2.begin();  // defaults to MSBFIRST, SPI_MODE0
 
     uint32_t t;
     for (uint8_t i = 0; i < len; i++) {

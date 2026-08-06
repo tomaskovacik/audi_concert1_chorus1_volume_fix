@@ -12,7 +12,9 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install arduino-cli
         run: |
@@ -42,7 +44,7 @@ jobs:
              build/audi_volume_fix_stm32_HWv5_${VERSION}.bin
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: build/audi_volume_fix_stm32_HWv5_*.bin
           generate_release_notes: true
